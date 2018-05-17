@@ -1,7 +1,10 @@
 import { app, sparql, uuid } from 'mu';
 import { getSessionIdHeader } from './utils';
 import { getAccessToken } from './lib/openid';
-import { removeOldSessions, ensureUserAndAccount, insertNewSessionForAccount, selectBestuurseenheidByOvoNumber } from './lib/session';
+import { removeOldSessions, removeCurrentSession,
+         ensureUserAndAccount, insertNewSessionForAccount,
+         selectAccountBySession, selectCurrentSession,
+         selectBestuurseenheidByOvoNumber } from './lib/session';
 
 const error = function(res, message, status = 400) {
   return res.status(status).json({errors: [ { title: message } ] });
@@ -75,7 +78,7 @@ app.post('/sessions', async function(req, res, next) {
       }
     });
   } catch(e) {
-    return error(res, e.message);
+    return next(new Error(e.message));
   }
 });
 
@@ -86,16 +89,24 @@ app.post('/sessions', async function(req, res, next) {
  * @return [204] On successful logout
  * @return [400] If the session header is missing or invalid
 */
-app.delete('/sessions/current', function(req, res, next) {
+app.delete('/sessions/current', async function(req, res, next) {
   const sessionUri = getSessionIdHeader(req);  
   if (!sessionUri)
-    return next(new Error('Session header is missing'));
-  
-  // TODO detach account from the session
+    return error(res, 'Session header is missing');    
 
-  // TODO logout out on the OpenID Provider (?)
+  try {
+    const { accountUri } = await selectAccountBySession(sessionUri);
+    if (!accountUri)
+      return error(res, 'Invalid session');
 
-  // TODO return response
+    await removeCurrentSession(sessionUri);
+
+    // TODO logout out on the OpenID Provider (?)
+
+    return res.status(204).end();
+  } catch(e) {
+    return next(new Error(e.message));
+  }    
 });
 
 /**
@@ -104,14 +115,40 @@ app.delete('/sessions/current', function(req, res, next) {
  * @return [200] The current session
  * @return [400] If the session header is missing or invalid
 */
-app.get('/sessions/current', function(req, res, next) {
+app.get('/sessions/current', async function(req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
     return next(new Error('Session header is missing'));
 
-  // TODO get the session information from the store
+  const { accountUri, accountId } = await selectAccountBySession(sessionUri);
+  if (!accountUri)
+    return error(res, 'Invalid session');
 
-  // TODO return response
+  const { sessionId, groupId } = await selectCurrentSession(accountUri);
+
+  try {
+    return res.status(201).send({
+      links: {
+        self: '/sessions/current'
+      },
+      data: {
+        type: 'sessions',
+        id: sessionId
+      },
+      relationships: {
+        account: {
+          links: { related: `/accounts/${accountId}` },
+          data: { type: 'accounts', id: accountId }
+        },
+        group: {
+          links: { related: `/bestuurseenheden/${groupId}` },
+          data: { type: 'bestuurseenheden', id: groupId }
+        }        
+      }
+    });
+  } catch(e) {
+    return next(new Error(e.message));
+  }  
 });
 
 
