@@ -114,8 +114,6 @@ app.delete('/sessions/current', async function(req, res, next) {
 
     await removeCurrentSession(sessionUri);
 
-    // TODO logout out on the OpenID Provider (?)
-
     return res.status(204).end();
   } catch(e) {
     return next(new Error(e.message));
