@@ -43,7 +43,6 @@ app.post('/sessions', async function(req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
     return error(res, 'Session header is missing');
-  console.log(`Session URI ${sessionUri} tries to login`);
 
   const authorizationCode = req.body['authorizationCode'];
   if (!authorizationCode)
@@ -53,8 +52,6 @@ app.post('/sessions', async function(req, res, next) {
     let tokenSet;
     try {
       tokenSet = await getAccessToken(authorizationCode);
-      console.log(`Retrieved tokenSet: ${tokenSet}\n${JSON.stringify(tokenSet)}`);
-      console.log(`Claims: ${tokenSet.claims}\n${JSON.stringify(tokenSet.claims)}`);
     } catch(e) {
       return res.status(401).end();
     }
@@ -65,7 +62,7 @@ app.post('/sessions', async function(req, res, next) {
     const { accountUri, accountId } = await ensureUserAndAccount(claims);
     const { groupUri, groupId } = await selectBestuurseenheidByOvoNumber(claims.vo_orgcode);
     if (!groupUri || !groupId) {
-      console.log(`No bestuurseenheid found for organization code ${claims.vo_orgcode}`);
+      console.log(`User is not allowed to login. No bestuurseenheid found for organization code ${claims.vo_orgcode}`);
       return res.status(403).end();
     }
     
