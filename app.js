@@ -1,14 +1,27 @@
 import { app, sparql, uuid } from 'mu';
-import { getSessionIdHeader } from './utils';
+import { getSessionIdHeader, error } from './utils';
 import { getAccessToken } from './lib/openid';
 import { removeOldSessions, removeCurrentSession,
          ensureUserAndAccount, insertNewSessionForAccount,
          selectAccountBySession, selectCurrentSession,
          selectBestuurseenheidByOvoNumber } from './lib/session';
 
-const error = function(res, message, status = 400) {
-  return res.status(status).json({errors: [ { title: message } ] });
-};
+/**
+ * Configuration validation on startup
+ */
+const requiredEnvironmentVariables = [
+  'MU_APPLICATION_AUTH_DISCOVERY_URL',
+  'MU_APPLICATION_AUTH_CLIENT_ID',
+  'MU_APPLICATION_AUTH_CLIENT_SECRET',
+  'MU_APPLICATION_AUTH_REDIRECT_URI'
+];
+requiredEnvironmentVariables.forEach(key => {
+  if (!process.env[key]) {
+    console.log(`Environment variable ${key} must be configured`);
+    process.exit(1);
+  }
+});
+
 
 /**
  * Log the user in by creating a new session, i.e. attaching the user's account to a session.
@@ -19,7 +32,7 @@ const error = function(res, message, status = 400) {
  * If the OpenID Provider returns a valid access token, a new user and account are created if they
  * don't exist yet and a the account is attached to the session.
  * 
- * Body: { authorization_code: "secret" }
+ * Body: { authorizationCode: "secret" }
  *
  * @return [201] On successful login containing the newly created session
  * @return [400] If the session header or authorization code is missing
@@ -32,7 +45,7 @@ app.post('/sessions', async function(req, res, next) {
     return error(res, 'Session header is missing');
   console.log(`Session URI ${sessionUri} tries to login`);
 
-  const authorizationCode = req.body['authorization_code'];
+  const authorizationCode = req.body['authorizationCode'];
   if (!authorizationCode)
     return error(res, 'Authorization code is missing');
 
@@ -127,7 +140,7 @@ app.get('/sessions/current', async function(req, res, next) {
   const { sessionId, groupId } = await selectCurrentSession(accountUri);
 
   try {
-    return res.status(201).send({
+    return res.status(200).send({
       links: {
         self: '/sessions/current'
       },
@@ -152,17 +165,9 @@ app.get('/sessions/current', async function(req, res, next) {
 });
 
 
-// development error handler - printing stacktrace
-if (app.get('env') === 'development') {
-  app.use(function(err, req, res, next) {
-    res.status(500);
-    res.json({
-      errors: [ {title: err.message} ]
-    });
-  });
-}
-
-// production error handler - no stacktrace
+/**
+ * Error handler translating thrown Errors to 500 HTTP responses
+*/ 
 app.use(function(err, req, res, next) {
   res.status(500);
   res.json({
