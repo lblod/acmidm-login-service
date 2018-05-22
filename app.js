@@ -164,6 +164,7 @@ app.get('/sessions/current', async function(req, res, next) {
  * Error handler translating thrown Errors to 500 HTTP responses
 */ 
 app.use(function(err, req, res, next) {
+  console.log(`Error: ${err.message}`);
   res.status(500);
   res.json({
     errors: [ {title: err.message} ]
