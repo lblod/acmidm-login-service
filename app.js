@@ -4,7 +4,7 @@ import { getAccessToken } from './lib/openid';
 import { removeOldSessions, removeCurrentSession,
          ensureUserAndAccount, insertNewSessionForAccount,
          selectAccountBySession, selectCurrentSession,
-         selectBestuurseenheidByOvoNumber } from './lib/session';
+         selectBestuurseenheidByNumber } from './lib/session';
 
 /**
  * Configuration validation on startup
@@ -59,14 +59,17 @@ app.post('/sessions', async function(req, res, next) {
     await removeOldSessions(sessionUri);
 
     const claims = tokenSet.claims;
-    const { accountUri, accountId } = await ensureUserAndAccount(claims);
-    const { groupUri, groupId } = await selectBestuurseenheidByOvoNumber(claims.vo_orgcode);
+
+    const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
     if (!groupUri || !groupId) {
-      console.log(`User is not allowed to login. No bestuurseenheid found for organization code ${claims.vo_orgcode}`);
-      return res.status(403).end();
+      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims.abb_loketLB_rol_3d)}`);
+      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
     }
     
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri);
+    const graph = `http://mu.semte.ch/graphs/org/${groupId}`;
+    const { accountUri, accountId } = await ensureUserAndAccount(claims, graph);
+
+    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, graph);
     
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
