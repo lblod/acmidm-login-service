@@ -68,7 +68,7 @@ app.post('/sessions', async function(req, res, next) {
     
     const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri);
     
-    return res.status(201).send({
+    return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
         self: '/sessions/current'
       },
@@ -111,7 +111,7 @@ app.delete('/sessions/current', async function(req, res, next) {
 
     await removeCurrentSession(sessionUri);
 
-    return res.status(204).end();
+    return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
   } catch(e) {
     return next(new Error(e.message));
   }    
