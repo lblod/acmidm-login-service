@@ -68,8 +68,9 @@ app.post('/sessions', async function(req, res, next) {
     
     const graph = `http://mu.semte.ch/graphs/org/${groupId}`;
     const { accountUri, accountId } = await ensureUserAndAccount(claims, graph);
+    const roles = claims.abb_loketLB_rol_3d.map(r => r.split(':')[0]);
 
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, graph);
+    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles, graph);
     
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
