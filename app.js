@@ -66,11 +66,10 @@ app.post('/sessions', async function(req, res, next) {
       return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
     }
     
-    const graph = `http://mu.semte.ch/graphs/org/${groupId}`;
-    const { accountUri, accountId } = await ensureUserAndAccount(claims, graph);
+    const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
     const roles = claims.abb_loketLB_rol_3d.map(r => r.split(':')[0]);
 
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles, graph);
+    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
     
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
@@ -132,13 +131,13 @@ app.get('/sessions/current', async function(req, res, next) {
   if (!sessionUri)
     return next(new Error('Session header is missing'));
 
-  const { accountUri, accountId } = await selectAccountBySession(sessionUri);
-  if (!accountUri)
-    return error(res, 'Invalid session');
-
-  const { sessionId, groupId } = await selectCurrentSession(accountUri);
-
   try {
+    const { accountUri, accountId } = await selectAccountBySession(sessionUri);
+    if (!accountUri)
+      return error(res, 'Invalid session');
+
+    const { sessionId, groupId } = await selectCurrentSession(accountUri);
+
     return res.status(200).send({
       links: {
         self: '/sessions/current'
