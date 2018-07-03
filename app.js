@@ -77,7 +77,10 @@ app.post('/sessions', async function(req, res, next) {
       },
       data: {
         type: 'sessions',
-        id: sessionId
+        id: sessionId,
+        attributes: {
+          roles: roles
+        }
       },
       relationships: {
         account: {
@@ -136,7 +139,7 @@ app.get('/sessions/current', async function(req, res, next) {
     if (!accountUri)
       return error(res, 'Invalid session');
 
-    const { sessionId, groupId } = await selectCurrentSession(accountUri);
+    const { sessionId, groupId, roles } = await selectCurrentSession(accountUri);
 
     return res.status(200).send({
       links: {
@@ -144,7 +147,10 @@ app.get('/sessions/current', async function(req, res, next) {
       },
       data: {
         type: 'sessions',
-        id: sessionId
+        id: sessionId,
+        attributes: {
+          roles: roles
+        }
       },
       relationships: {
         account: {
