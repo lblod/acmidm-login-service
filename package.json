@@ -1,6 +1,6 @@
 {
   "name": "acmidm-login-service",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Microservice to login using ACM/IDM with OpenId",
   "dependencies": {
     "openid-client": "^2.0.3"
