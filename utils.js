@@ -25,5 +25,6 @@ const error = function(res, message, status = 400) {
 
 export {
   getSessionIdHeader,
-  getRewriteUrlHeader
+  getRewriteUrlHeader,
+  error
 }
