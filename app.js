@@ -58,11 +58,11 @@ app.post('/sessions', async function(req, res, next) {
 
     await removeOldSessions(sessionUri);
 
-    if( process.env['DEBUG_LOG_TOKENSETS'] ){
-      console.log('Received tokenSet %j', tokenSet);
-    }
-
     const claims = tokenSet.claims;
+
+    if (process.env['DEBUG_LOG_TOKENSETS']){
+      console.log(`Received tokenSet ${tokenSet} including claims ${JSON.stringify(claims)}`);
+    }
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
     if (!groupUri || !groupId) {
