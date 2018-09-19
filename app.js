@@ -66,7 +66,7 @@ app.post('/sessions', async function(req, res, next) {
     }
 
     if (process.env['LOG_SINK_URL'])
-      request.post(process.env['LOG_SINK_URL'], tokenSet);
+      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true});
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
     if (!groupUri || !groupId) {
