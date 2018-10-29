@@ -6,6 +6,8 @@ import { removeOldSessions, removeCurrentSession,
          selectAccountBySession, selectCurrentSession,
          selectBestuurseenheidByNumber } from './lib/session';
 
+const roleClaim = process.env.MU_APPLICATION_AUTH_ROLE_CLAIM || 'abb_loketLB_rol_3d';
+
 /**
  * Configuration validation on startup
  */
@@ -66,12 +68,12 @@ app.post('/sessions', async function(req, res, next) {
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
     if (!groupUri || !groupId) {
-      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims.abb_loketLB_rol_3d)}`);
+      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
       return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
     }
     
     const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
-    const roles = claims.abb_loketLB_rol_3d.map(r => r.split(':')[0]);
+    const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
 
     const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
     

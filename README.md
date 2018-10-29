@@ -27,6 +27,7 @@ The following enviroment variables can be configured:
 * `MU_APPLICATION_AUTH_CLIENT_SECRET` [string]: Client secret of the application in ACM/IDM
 * `MU_APPLICATION_AUTH_REDIRECT_URI` [string]: Redirect URI of the application configured in ACM/IDM
 * `MU_APPLICATION_AUTH_SCOPE` [string]: Space-separated string of scopes to grant access for (default `openid rrn vo profile abb_loketLB`)
+* `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
 * `MU_APPLICATION_RESOURCE_BASE_URI` [string]: Base URI to use for resources created by this service. The URI must end with a trailing slash! (default: `http://data.lblod.info/`)
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
 
@@ -35,9 +36,21 @@ The following enviroment variables can be configured:
 #### POST /sessions
 Log the user in by creating a new session, i.e. attaching the user's account to a session.
 
-Before creating a new session, the given authorization code gets exchanged for an access token with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token is decoded to retrieve information to attach to the user, account and the session. 
+Before creating a new session, the given authorization code gets exchanged for an access token with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token is decoded to retrieve information to attach to the user, account and the session. If the OpenID Provider returns a valid access token, a new user and account are created if they don't exist yet and a the account is attached to the session. 
 
-If the OpenID Provider returns a valid access token, a new user and account are created if they don't exist yet and a the account is attached to the session.
+The service expects the access token to include the following claims:
+* `rrn` (rijksregisternummer) (1)
+* `given_name` (1)
+* `family_name` (1)
+* `vo_id` (2)
+* `vo_doelgroepcode` (2)
+* `vo_doelgroepnaam` (2)
+* `vo_orgcode` (3)
+* `env.MU_APPLICATION_AUTH_ROLE_CLAIM` (3)
+
+(1) Information is attached to the user object in the store
+(2) Information is attached to the account object in the store
+(3) Information is attached to the session in the store
 
 ##### Request body
 ```javascript
