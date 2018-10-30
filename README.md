@@ -40,18 +40,20 @@ Log the user in by creating a new session, i.e. attaching the user's account to 
 Before creating a new session, the given authorization code gets exchanged for an access token with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token is decoded to retrieve information to attach to the user, account and the session. If the OpenID Provider returns a valid access token, a new user and account are created if they don't exist yet and a the account is attached to the session. 
 
 The service expects the access token to include the following claims:
-* `rrn` (rijksregisternummer) (1)
-* `given_name` (1)
-* `family_name` (1)
-* `vo_id` (2)
-* `vo_doelgroepcode` (2)
-* `vo_doelgroepnaam` (2)
-* `vo_orgcode` (3)
-* `env.MU_APPLICATION_AUTH_ROLE_CLAIM` (3)
+* `rrn` (rijksregisternummer)<sup>1</sup>
+* `given_name`<sup>1</sup>
+* `family_name`<sup>1</sup>
+* `vo_id`<sup>2</sup>
+* `vo_doelgroepcode`<sup>2</sup>
+* `vo_doelgroepnaam`<sup>2</sup>
+* `vo_orgcode`<sup>3</sup>
+* `env.MU_APPLICATION_AUTH_ROLE_CLAIM`<sup>3</sup>
 
-(1) Information is attached to the user object in the store
-(2) Information is attached to the account object in the store
-(3) Information is attached to the session in the store
+<sup>1</sup>Information is attached to the user object in the store
+
+<sup>2</sup> Information is attached to the account object in the store
+
+<sup>3</sup> Information is attached to the session in the store
 
 ##### Request body
 ```javascript
