@@ -28,6 +28,8 @@ The following enviroment variables can be configured:
 * `MU_APPLICATION_AUTH_REDIRECT_URI` [string]: Redirect URI of the application configured in ACM/IDM
 * `MU_APPLICATION_AUTH_SCOPE` [string]: Space-separated string of scopes to grant access for (default `openid rrn vo profile abb_loketLB`)
 * `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
+* `MU_APPLICATION_AUTH_USERID_CLAIM` [string]: Key of the claim that contains the user's ientifier (default `rrn`)
+* `MU_APPLICATION_AUTH_ACCOUNTID_CLAIM` [string]: Key of the claim that contains the account's identifier (default `vo_id`)
 * `MU_APPLICATION_RESOURCE_BASE_URI` [string]: Base URI to use for resources created by this service. The URI must end with a trailing slash! (default: `http://data.lblod.info/`)
 * `MU_APPLICATION_GRAPH` [string]: URI of the graph in which Bestuurseenheden are stored (default `http://mu.semte.ch/graphs/public`)
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
@@ -40,11 +42,11 @@ Log the user in by creating a new session, i.e. attaching the user's account to 
 
 Before creating a new session, the given authorization code gets exchanged for an access token with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token is decoded to retrieve information to attach to the user, account and the session. If the OpenID Provider returns a valid access token, a new user and account are created if they don't exist yet and a the account is attached to the session. 
 
-The service expects the access token to include the following claims:
-* `rrn` (rijksregisternummer)<sup>1</sup>
+The service handless the following claims included in the access token. Only the claims configured through the environment variables and the claim `vo_orgcode` are required. All other claims are optional.
+* `env.MU_APPLICATION_AUTH_USERID_CLAIM`<sup>1</sup>
 * `given_name`<sup>1</sup>
 * `family_name`<sup>1</sup>
-* `vo_id`<sup>2</sup>
+* `env.MU_APPLICATION_AUTH_ACCOUNTID_CLAIM`<sup>2</sup>
 * `vo_doelgroepcode`<sup>2</sup>
 * `vo_doelgroepnaam`<sup>2</sup>
 * `vo_orgcode`<sup>3</sup>
