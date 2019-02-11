@@ -29,6 +29,7 @@ The following enviroment variables can be configured:
 * `MU_APPLICATION_AUTH_SCOPE` [string]: Space-separated string of scopes to grant access for (default `openid rrn vo profile abb_loketLB`)
 * `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
 * `MU_APPLICATION_RESOURCE_BASE_URI` [string]: Base URI to use for resources created by this service. The URI must end with a trailing slash! (default: `http://data.lblod.info/`)
+* `MU_APPLICATION_GRAPH` [string]: URI of the graph in which Bestuurseenheden are stored (default `http://mu.semte.ch/graphs/public`)
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
 * `LOG_SINK_URL`: When set, log tokenSet information to that configured sink. 
 
