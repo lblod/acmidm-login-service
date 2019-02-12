@@ -56,6 +56,7 @@ app.post('/sessions', async function(req, res, next) {
     try {
       tokenSet = await getAccessToken(authorizationCode);
     } catch(e) {
+      console.log(`Failed to retrieve access token for authorization code: ${e.message || e}`);
       return res.status(401).end();
     }
 
