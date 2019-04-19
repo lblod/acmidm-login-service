@@ -1,5 +1,6 @@
 import { app, sparql, uuid } from 'mu';
 import { getSessionIdHeader, error } from './utils';
+import { saveLog } from './logs';
 import { getAccessToken } from './lib/openid';
 import { removeOldSessions, removeCurrentSession,
          ensureUserAndAccount, insertNewSessionForAccount,
@@ -8,6 +9,7 @@ import { removeOldSessions, removeCurrentSession,
 import request from 'request';
 
 const roleClaim = process.env.MU_APPLICATION_AUTH_ROLE_CLAIM || 'abb_loketLB_rol_3d';
+const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 
 /**
  * Configuration validation on startup
@@ -24,7 +26,6 @@ requiredEnvironmentVariables.forEach(key => {
     process.exit(1);
   }
 });
-
 
 /**
  * Log the user in by creating a new session, i.e. attaching the user's account to a session.
@@ -72,8 +73,15 @@ app.post('/sessions', async function(req, res, next) {
       request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true});
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
+
     if (!groupUri || !groupId) {
       console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
+      saveLog(
+        logsGraph,
+        `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
+        `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
+        sessionUri,
+        claims.vo_orgcode);
       return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
     }
 
