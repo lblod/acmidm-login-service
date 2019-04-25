@@ -5,8 +5,7 @@
   "dependencies": {
     "@lblod/mu-auth-sudo": "^0.2.0",
     "moment": "^2.24.0",
-    "openid-client": "^2.0.3",
-    "uuid": "^3.3.2"
+    "openid-client": "^2.0.3"
   },
   "devDependencies": {},
   "scripts": {
