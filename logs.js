@@ -1,4 +1,4 @@
-import { querySudo as query } from '@lblod/mu-auth-sudo';
+import { updateSudo as update } from '@lblod/mu-auth-sudo';
 import { sparqlEscapeString, sparqlEscapeUri, uuid } from 'mu';
 import moment from 'moment';
 
@@ -12,7 +12,7 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
   const logEntryUri = "http://data.lblod.info/id/log-entries/".concat(logEntryUuid);
   const acmIdmLogEntryUri = "http://data.lblod.info/id/acm-idm-service-log-entries/".concat(acmIdmLogEntryUuid);
 
-  const result = await query(`
+  const result = await update(`
     PREFIX rlog: <http://persistence.uni-leipzig.org/nlp2rdf/ontologies/rlog#>
     PREFIX dct: <http://purl.org/dc/terms/>
     PREFIX ext: <http://mu.semte.ch/vocabularies/ext/>
