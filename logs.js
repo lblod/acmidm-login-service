@@ -21,7 +21,7 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
        GRAPH ${sparqlEscapeUri(logsGraph)} {
           ${sparqlEscapeUri(logEntryUri)} a rlog:Entry ;
               <http://mu.semte.ch/vocabularies/core/uuid> "${(logEntryUuid)}" ;
-              dct:source <http://mu.semte.ch/log-sources/c7806563-25a4-46c8-9be2-a0cdf0db1f98> ;
+              dct:source <http://data.lblod.info/id/log-sources/c7806563-25a4-46c8-9be2-a0cdf0db1f98> ;
               rlog:className ${sparqlEscapeUri(classNameUri)} ;
               rlog:message ${sparqlEscapeString(message)} ;
               rlog:date "${moment().format()}" ;
