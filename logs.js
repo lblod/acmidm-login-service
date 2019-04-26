@@ -14,7 +14,7 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
     kbonummer: kbonummer
   };
 
-  const stringifiedSpecificInformation = JSON.stringify(JSON.stringify(specificInformation)); // Has to be stringified twice to espace quotes
+  const stringifiedSpecificInformation = JSON.stringify(specificInformation);
 
   const result = await update(`
     PREFIX rlog: <http://persistence.uni-leipzig.org/nlp2rdf/ontologies/rlog#>
@@ -30,7 +30,7 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
               rlog:message ${sparqlEscapeString(message)} ;
               rlog:date ${sparqlEscapeDateTime(moment().format())} ;
               rlog:level <http://data.lblod.info/id/log-levels/3af9ebe1-e6a8-495c-a392-16ced1f38ef1> ;
-              ext:specificInformation ${stringifiedSpecificInformation} .
+              ext:specificInformation """${stringifiedSpecificInformation}""" .
         }
     }
   `);
