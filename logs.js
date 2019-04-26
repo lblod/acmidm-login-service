@@ -7,10 +7,14 @@ import moment from 'moment';
 */
 const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbonummer) {
   const logEntryUuid = uuid();
-  const acmIdmLogEntryUuid = uuid();
-
   const logEntryUri = "http://data.lblod.info/id/log-entries/".concat(logEntryUuid);
-  const acmIdmLogEntryUri = "http://data.lblod.info/id/acm-idm-service-log-entries/".concat(acmIdmLogEntryUuid);
+
+  const specificInformation = {
+    sessionUri: sessionUri,
+    kbonummer: kbonummer
+  };
+
+  const stringifiedSpecificInformation = JSON.stringify(JSON.stringify(specificInformation)); // Has to be stringified twice to espace quotes
 
   const result = await update(`
     PREFIX rlog: <http://persistence.uni-leipzig.org/nlp2rdf/ontologies/rlog#>
@@ -20,18 +24,13 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
     INSERT DATA {
        GRAPH ${sparqlEscapeUri(logsGraph)} {
           ${sparqlEscapeUri(logEntryUri)} a rlog:Entry ;
-              <http://mu.semte.ch/vocabularies/core/uuid> "${(logEntryUuid)}" ;
+              <http://mu.semte.ch/vocabularies/core/uuid> ${sparqlEscapeString(logEntryUuid)} ;
               dct:source <http://data.lblod.info/id/log-sources/c7806563-25a4-46c8-9be2-a0cdf0db1f98> ;
               rlog:className ${sparqlEscapeUri(classNameUri)} ;
               rlog:message ${sparqlEscapeString(message)} ;
               rlog:date ${sparqlEscapeDateTime(moment().format())} ;
               rlog:level <http://data.lblod.info/id/log-levels/3af9ebe1-e6a8-495c-a392-16ced1f38ef1> ;
-              rlog:resource ${sparqlEscapeUri(acmIdmLogEntryUri)} .
-
-          ${sparqlEscapeUri(acmIdmLogEntryUri)} a ext:AcmIdmServiceLogEntry ;
-              <http://mu.semte.ch/vocabularies/core/uuid> "${(acmIdmLogEntryUuid)}" ;
-              ext:sessionUri ${sparqlEscapeUri(sessionUri)} ;
-              ext:kbonummer ${sparqlEscapeString(kbonummer)} .
+              ext:specificInformation ${stringifiedSpecificInformation} .
         }
     }
   `);
