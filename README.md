@@ -30,6 +30,7 @@ The following enviroment variables can be configured:
 * `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
 * `MU_APPLICATION_AUTH_USERID_CLAIM` [string]: Key of the claim that contains the user's ientifier (default `rrn`)
 * `MU_APPLICATION_AUTH_ACCOUNTID_CLAIM` [string]: Key of the claim that contains the account's identifier (default `vo_id`)
+* `MU_APPLICATION_AUTH_REQUEST_TIMEOUT` [int]: Timeout in ms of OpenID HTTP requests (default `5000`)
 * `MU_APPLICATION_RESOURCE_BASE_URI` [string]: Base URI to use for resources created by this service. The URI must end with a trailing slash! (default: `http://data.lblod.info/`)
 * `MU_APPLICATION_GRAPH` [string]: URI of the graph in which Bestuurseenheden are stored (default `http://mu.semte.ch/graphs/public`)
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
