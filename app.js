@@ -1,14 +1,13 @@
-import { app, sparql, uuid } from 'mu';
+import { app } from 'mu';
 import { getSessionIdHeader, error } from './utils';
 import { saveLog } from './logs';
 import { getAccessToken } from './lib/openid';
-import { removeOldSessions, removeCurrentSession,
+import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
          ensureUserAndAccount, insertNewSessionForAccount,
          selectAccountBySession, selectCurrentSession,
          selectBestuurseenheidByNumber } from './lib/session';
 import request from 'request';
 
-const roleClaim = process.env.MU_APPLICATION_AUTH_ROLE_CLAIM || 'abb_loketLB_rol_3d';
 const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 
 /**
@@ -63,14 +62,14 @@ app.post('/sessions', async function(req, res, next) {
 
     await removeOldSessions(sessionUri);
 
-    const claims = tokenSet.claims;
+    const claims = tokenSet.claims();
 
-    if (process.env['DEBUG_LOG_TOKENSETS']){
+    if (process.env['DEBUG_LOG_TOKENSETS']) {
       console.log(`Received tokenSet ${JSON.stringify(tokenSet)} including claims ${JSON.stringify(claims)}`);
     }
 
     if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true});
+      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
 
@@ -81,7 +80,7 @@ app.post('/sessions', async function(req, res, next) {
         `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
         `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
         sessionUri,
-        claims.vo_orgcode);
+        claims[groupIdClaim]);
       return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
     }
 
