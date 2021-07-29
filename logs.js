@@ -30,11 +30,11 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
               rlog:message ${sparqlEscapeString(message)} ;
               rlog:date ${sparqlEscapeDateTime(moment().format())} ;
               rlog:level <http://data.lblod.info/id/log-levels/3af9ebe1-e6a8-495c-a392-16ced1f38ef1> ;
-              ext:specificInformation """${stringifiedSpecificInformation}""" .
+              ext:specificInformation ${sparqlEscapeString(stringifiedSpecificInformation)} .
         }
     }
   `);
-}
+};
 
 export {
   saveLog
