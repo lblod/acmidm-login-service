@@ -1,17 +1,17 @@
 import { app } from 'mu';
 import { getSessionIdHeader, error } from './utils';
-import { saveLog } from './logs';
 import { getAccessToken } from './lib/openid';
-import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
-         ensureUserAndAccount, insertNewSessionForAccount,
-         selectAccountBySession, selectCurrentSession,
-         selectBestuurseenheidByNumber } from './lib/session';
+import {
+  removeOldSessions, removeCurrentSession,
+  ensureUserAndAccount, insertNewSessionForAccount,
+  selectAccountBySession, selectCurrentSession  
+} from './lib/session';
 import request from 'request';
 
 const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 
 /**
- * Configuration validation on startup
+ * Configuration validation on startuxp
  */
 const requiredEnvironmentVariables = [
   'MU_APPLICATION_AUTH_DISCOVERY_URL',
@@ -42,7 +42,7 @@ requiredEnvironmentVariables.forEach(key => {
  * @return [401] On login failure (unable to retrieve a valid access token)
  * @return [403] If no bestuurseenheid can be linked to the session
 */
-app.post('/sessions', async function(req, res, next) {
+app.post('/sessions', async function (req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
     return error(res, 'Session header is missing');
@@ -55,7 +55,7 @@ app.post('/sessions', async function(req, res, next) {
     let tokenSet;
     try {
       tokenSet = await getAccessToken(authorizationCode);
-    } catch(e) {
+    } catch (e) {
       console.log(`Failed to retrieve access token for authorization code: ${e.message || e}`);
       return res.status(401).end();
     }
@@ -68,26 +68,12 @@ app.post('/sessions', async function(req, res, next) {
       console.log(`Received tokenSet ${JSON.stringify(tokenSet)} including claims ${JSON.stringify(claims)}`);
     }
 
-    if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
+    //if (process.env['LOG_SINK_URL'])
+    //request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
-    const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
+    const { accountUri, accountId } = await ensureUserAndAccount(claims);
 
-    if (!groupUri || !groupId) {
-      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
-      saveLog(
-        logsGraph,
-        `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
-        `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
-        sessionUri,
-        claims[groupIdClaim]);
-      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
-    }
-
-    const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
-    const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
-
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
+    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
@@ -95,23 +81,16 @@ app.post('/sessions', async function(req, res, next) {
       },
       data: {
         type: 'sessions',
-        id: sessionId,
-        attributes: {
-          roles: roles
-        }
+        id: sessionId
       },
       relationships: {
         account: {
           links: { related: `/accounts/${accountId}` },
           data: { type: 'accounts', id: accountId }
-        },
-        group: {
-          links: { related: `/bestuurseenheden/${groupId}` },
-          data: { type: 'bestuurseenheden', id: groupId }
         }
       }
     });
-  } catch(e) {
+  } catch (e) {
     return next(new Error(e.message));
   }
 });
@@ -123,7 +102,7 @@ app.post('/sessions', async function(req, res, next) {
  * @return [204] On successful logout
  * @return [400] If the session header is missing or invalid
 */
-app.delete('/sessions/current', async function(req, res, next) {
+app.delete('/sessions/current', async function (req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
     return error(res, 'Session header is missing');
@@ -136,7 +115,7 @@ app.delete('/sessions/current', async function(req, res, next) {
     await removeCurrentSession(sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
-  } catch(e) {
+  } catch (e) {
     return next(new Error(e.message));
   }
 });
@@ -147,7 +126,7 @@ app.delete('/sessions/current', async function(req, res, next) {
  * @return [200] The current session
  * @return [400] If the session header is missing or invalid
 */
-app.get('/sessions/current', async function(req, res, next) {
+app.get('/sessions/current', async function (req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
     return next(new Error('Session header is missing'));
@@ -181,7 +160,7 @@ app.get('/sessions/current', async function(req, res, next) {
         }
       }
     });
-  } catch(e) {
+  } catch (e) {
     return next(new Error(e.message));
   }
 });
@@ -190,10 +169,10 @@ app.get('/sessions/current', async function(req, res, next) {
 /**
  * Error handler translating thrown Errors to 500 HTTP responses
 */
-app.use(function(err, req, res, next) {
+app.use(function (err, req, res, next) {
   console.log(`Error: ${err.message}`);
   res.status(500);
   res.json({
-    errors: [ {title: err.message} ]
+    errors: [{ title: err.message }]
   });
 });
