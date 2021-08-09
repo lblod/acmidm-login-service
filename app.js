@@ -91,6 +91,7 @@ app.post('/sessions', async function (req, res, next) {
       }
     });
   } catch (e) {
+    console.error("error:",e);
     return next(new Error(e.message));
   }
 });
