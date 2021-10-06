@@ -4,11 +4,8 @@ import { getAccessToken } from './lib/openid';
 import {
   removeOldSessions, removeCurrentSession,
   ensureUserAndAccount, insertNewSessionForAccount,
-  selectAccountBySession, selectCurrentSession  
+  selectAccountBySession, selectCurrentSession
 } from './lib/session';
-import request from 'request';
-
-const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 
 /**
  * Configuration validation on startuxp
@@ -17,6 +14,7 @@ const requiredEnvironmentVariables = [
   'MU_APPLICATION_AUTH_DISCOVERY_URL',
   'MU_APPLICATION_AUTH_CLIENT_ID',
   'MU_APPLICATION_AUTH_CLIENT_SECRET',
+  'MU_APPLICATION_GRAPH',
   'MU_APPLICATION_AUTH_REDIRECT_URI'
 ];
 requiredEnvironmentVariables.forEach(key => {
@@ -91,7 +89,7 @@ app.post('/sessions', async function (req, res, next) {
       }
     });
   } catch (e) {
-    console.error("error:",e);
+    console.error("error:", e);
     return next(new Error(e.message));
   }
 });
