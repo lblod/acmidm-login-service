@@ -37,6 +37,9 @@ The following enviroment variables can be configured:
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
 * `LOG_SINK_URL`: When set, log tokenSet information to that configured sink.
 * `LOGS_GRAPH` [string]: URI of the graph in which LogEntries are stored (default `http://mu.semte.ch/graphs/public`).
+* `SESSION_GRAPH` [string]: URI of the graph in which sessions are stored (default `http://mu.semte.ch/graphs/sessions`)
+* `ACCOUNT_GRAPH_TEMPLATE` [string]: URI template of the graph in which accounts are stored. You can (optionally use) `{{groupId}}` (default `http://mu.semte.ch/graphs/organizations/{{groupId}}`)
+* `USER_GRAPH_TEMPLATE` [string]: URI template of the graph in which users are stored. You can (optionally use) `{{groupId}}` (default `http://mu.semte.ch/graphs/organizations/{{groupId}}`)
 
 ## Available requests
 
