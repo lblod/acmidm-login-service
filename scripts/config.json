@@ -1,0 +1,17 @@
+{
+  "version": "0.1",
+  "scripts": [
+    {
+      "documentation": {
+        "command": "generate-jwk",
+        "description": "Generate a public/private key pair to authenticate using JWT",
+        "arguments": []
+      },
+      "environment": {
+        "image": "semtech/mu-python-template:2.0.0-beta.2",
+        "interactive": false,
+        "script": "generate-jwk/run.sh"
+      }
+    }
+  ]
+}
