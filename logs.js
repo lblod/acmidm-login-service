@@ -1,6 +1,5 @@
 import { updateSudo as update } from '@lblod/mu-auth-sudo';
 import { sparqlEscapeString, sparqlEscapeUri, sparqlEscapeDateTime, uuid } from 'mu';
-import moment from 'moment';
 
 /**
  * Save the log into the database.
@@ -28,7 +27,7 @@ const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbo
               dct:source <http://data.lblod.info/id/log-sources/c7806563-25a4-46c8-9be2-a0cdf0db1f98> ;
               rlog:className ${sparqlEscapeUri(classNameUri)} ;
               rlog:message ${sparqlEscapeString(message)} ;
-              rlog:date ${sparqlEscapeDateTime(moment().format())} ;
+              rlog:date ${sparqlEscapeDateTime(new Date())} ;
               rlog:level <http://data.lblod.info/id/log-levels/3af9ebe1-e6a8-495c-a392-16ced1f38ef1> ;
               ext:specificInformation ${sparqlEscapeString(stringifiedSpecificInformation)} .
         }

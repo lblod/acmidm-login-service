@@ -1,5 +1,5 @@
 # ACM/IDM login microservice
-Microservice running on [mu.semte.ch](http://mu.semte.ch) providing the necessary endpoints to login/logout a user using ACM/IDM as OpenId provider. This backend service works together with [`@lblod/ember-acmidm-login`](https://github.com/lblod/ember-acmidm-login) in the frontend.
+Microservice running on [mu.semte.ch](http://mu.semte.ch) providing the necessary endpoints to login/logout a user using [ACM/IDM as OpenId provider](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/). This backend service works together with [`@lblod/ember-acmidm-login`](https://github.com/lblod/ember-acmidm-login) in the frontend.
 
 ## Tutorials
 ### Add the login service to a stack
@@ -9,7 +9,7 @@ Add the following snippet to your `docker-compose.yml` to include the login serv
 login:
   image: lblod/acmidm-login-service
   environment:
-      MU_APPLICATION_AUTH_DISCOVERY_URL: "https://authenticatie.vlaanderen.be/op"
+      MU_APPLICATION_AUTH_DISCOVERY_URL: "https://authenticatie.vlaanderen.be/op/.well-known/openid-configuration"
       MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
       MU_APPLICATION_AUTH_REDIRECT_URI: "https://myapp.vlaanderen.be/authorization/callback"
       MU_APPLICATION_AUTH_CLIENT_SECRET: "my-secret"
@@ -246,3 +246,6 @@ Get the current session
 
 ###### 400 Bad Request
 If session header is missing or invalid. The header should be automatically set by the [identifier](https://github.com/mu-semtech/mu-identifier).
+
+### ACM/IDM OpenID Connect
+More information on the OpenID Connect integration with ACM/IDM can be found on the [ACM/IDM documentation website](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/) (Dutch only).
