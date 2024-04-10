@@ -16,7 +16,6 @@ const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 const requiredEnvironmentVariables = [
   'MU_APPLICATION_AUTH_DISCOVERY_URL',
   'MU_APPLICATION_AUTH_CLIENT_ID',
-  'MU_APPLICATION_AUTH_CLIENT_SECRET',
   'MU_APPLICATION_AUTH_REDIRECT_URI'
 ];
 requiredEnvironmentVariables.forEach(key => {
