@@ -31,16 +31,56 @@ Restart the `dispatcher` service and create the login service:
 docker compose restart dispatcher
 docker compose up -d login
 ```
+## How-to guides
+### Authenticate using client id and secret
+To authenticate using a client ID and secret, simply configure the `MU_APPLICATION_AUTH_CLIENT_ID` and `MU_APPLICATION_AUTH_CLIENT_SECRET` environments variables on the service:
+
+```yml
+login:
+  image: lblod/acmidm-login-service
+  environment:
+      MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
+      MU_APPLICATION_AUTH_CLIENT_SECRET: "my-secret"
+```
+
+Make sure to keep the client secret private (e.g. don't commit it in your code repository). Therefore this environment variable is typcially set in `docker-compose.override.yml`.
+
+### Authenticate using JWT with public/private key
+To authenticate using JWT with a public/private key pair, you first need to generate a public and private key.
+
+```bash
+mu script login generate-jwk
+```
+
+Copy the private key into `./config/openid/jwk_private_key.json`. Make sure not to commit this file in your code repository.
+
+Share the public key with the OpenID Connect Provider (for ACM/IDM by filling it in in the integration document). Also store it somewhere in a file as backup.
+
+Next, set the `MU_APPLICATION_AUTH_CLIENT_ID` environment variable and mount the config folder as a volume in the login service:
+
+```yml
+login:
+  image: lblod/acmidm-login-service
+  environment:
+      MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
+  volumes:
+    - ./config/openid:/config
+```
 
 ## Reference
 ### Configuration
 The following environment variables must be configured:
 * `MU_APPLICATION_AUTH_DISCOVERY_URL` [string]: OpenId discovery URL for authentication
 * `MU_APPLICATION_AUTH_CLIENT_ID` [string]: Client id of the application in ACM/IDM
-* `MU_APPLICATION_AUTH_CLIENT_SECRET` [string]: Client secret of the application in ACM/IDM
 * `MU_APPLICATION_AUTH_REDIRECT_URI` [string]: Redirect URI of the application configured in ACM/IDM
 
+In case of authentication using a client id and secret, the following environment variable must be set:
+* `MU_APPLICATION_AUTH_CLIENT_SECRET` [string]: Client secret of the application in ACM/IDM
+
 Client ID and client secret typically differ per deployment environment.
+
+In case of authentication using a JWT token with a public/private key, the following environment variable can optionally be set:
+* `MU_APPLICATION_AUTH_JWK_PRIVATE_KEY` [string]: Path to a JSON file containing the private key to sign the JWT client assertion with. (default: `/config/jwk_private_key.json`)
 
 The following environment variables can optionally be set to configure the name of the claim from which specific information is retrieved:
 * `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
@@ -249,3 +289,8 @@ If session header is missing or invalid. The header should be automatically set 
 
 ### ACM/IDM OpenID Connect
 More information on the OpenID Connect integration with ACM/IDM can be found on the [ACM/IDM documentation website](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/) (Dutch only).
+
+Currently this service supports 2 of the authentication methods (see 'How-to guides')
+1. Authentication using client ID and secret via basic auth
+2. Authentication using a JWT token with an RSA256 public/private key
+
