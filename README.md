@@ -100,6 +100,8 @@ The following environment variables can optionally be set:
 * `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
 * `LOG_SINK_URL`: When set, received tokenSet information is sent to the configured sink URL.
 * `MU_APPLICATION_AUTH_REQUEST_TIMEOUT` [int]: Timeout in ms of OpenID HTTP requests (default `5000`)
+* `ORGANIZATION_TYPE` [string]: Defines the group type linked to an account (default `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid`)
+* `GROUP_TYPE_LABEL` [string]: Defines the resources group type label (default 'bestuurseenheden')
 
 ### Data model
 #### Prefixes
