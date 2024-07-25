@@ -5,7 +5,8 @@ import { getAccessToken } from './lib/openid';
 import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
          ensureUserAndAccount, insertNewSessionForAccount,
          selectAccountBySession, selectCurrentSession,
-         selectGroupByNumber } from './lib/session';
+         selectGroupByNumber, 
+         createEconomischeActorByClaims} from './lib/session';
 import request from 'request';
 import { GROUP_TYPE_LABEL } from './config';
 
@@ -71,17 +72,30 @@ app.post('/sessions', async function(req, res, next) {
     if (process.env['LOG_SINK_URL'])
       request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
-    const { groupUri, groupId } = await selectGroupByNumber(claims);
+    let { groupUri, groupId } = await selectGroupByNumber(claims);
+
+    const isEconomischeActor = claims.vo_doelgroepcode == "EA"
 
     if (!groupUri || !groupId) {
-      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
-      saveLog(
-        logsGraph,
-        `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
-        `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
-        sessionUri,
-        claims[groupIdClaim]);
-      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
+      if(isEconomischeActor) {
+        await createEconomischeActorByClaims(claims);
+        ({ groupUri, groupId } = await selectGroupByNumber(claims));  
+
+
+        if (!groupUri || !groupId) {
+          console.log(`Error: GroupUri and GroupID are still empty even after creating them! Claims = ${JSON.stringify(claims)}`);
+          return res.header('mu-auth-allowed-groups', 'CLEAR').status(500).end();
+        }
+      } else {
+        console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
+        saveLog(
+          logsGraph,
+          `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
+          `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
+          sessionUri,
+          claims[groupIdClaim]);
+        return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
+      }
     }
 
     const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
