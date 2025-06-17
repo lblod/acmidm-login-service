@@ -194,6 +194,14 @@ app.get('/sessions/current', async function(req, res, next) {
  * You'll find these decoded claims in the logs when someone logs in through ACM.
  * Once you have these, it's a literal copy/paste POST request
  * You'll need wiring in dispatcher to make this thing work.
+ *
+ *  match "/debug/sessions/*path", @json do
+ *    Proxy.forward conn, path, "http://login/debug/sessions/"
+ *  end
+ *
+ *  Also using it through the frontend, you will need to spoof it:
+ *    see: https://cloud.ruizdearcaute.com/s/AATJdEoLaGNdZBx
+ *
  * Be cautious. Know what you are doing...
  *
  * Log the user in by creating a new session, i.e. attaching the user's account to a session.
