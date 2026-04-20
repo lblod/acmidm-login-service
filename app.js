@@ -246,9 +246,6 @@ app.post('/debug/sessions/claims', async function(req, res, next) {
       console.log(`Received claims to DEBUG: ${JSON.stringify(claims)}`);
     }
 
-    if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: claims, json: true });
-
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
 
     if (!groupUri || !groupId) {
