@@ -247,7 +247,7 @@ app.post('/debug/sessions/claims', async function(req, res, next) {
     }
 
     if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
+      request.post({ url: process.env['LOG_SINK_URL'], body: claims, json: true });
 
     const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
 
