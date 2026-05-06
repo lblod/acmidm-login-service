@@ -232,6 +232,7 @@ app.get('/sessions/current', async function(req, res, next) {
  * @return [201] On successful login containing the newly created session
  * @return [403] If no bestuurseenheid can be linked to the session
 */
+// NOTE: only works with Content-Type: application/vnd.api+json
 app.post('/debug/sessions/claims', async function(req, res, next) {
   const sessionUri = getSessionIdHeader(req);
   if (!sessionUri)
