@@ -156,7 +156,7 @@ app.get('/sessions/current', async function(req, res, next) {
     if (!accountUri)
       return error(res, 'Invalid session');
 
-    const { sessionId, groupId, roles } = await selectCurrentSession(accountUri);
+    const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
     return res.status(200).send({
       links: {
