@@ -1,5 +1,5 @@
 import { app } from 'mu';
-import { getSessionIdHeader, error } from './utils';
+import { error } from './utils';
 import { saveLog } from './logs';
 import { getAccessToken } from './lib/openid';
 import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
@@ -44,7 +44,7 @@ requiredEnvironmentVariables.forEach(key => {
  * @return [403] If no bestuurseenheid can be linked to the session
 */
 app.post('/sessions', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
+  const sessionUri = req.get('mu-session-id');
   if (!sessionUri)
     return error(res, 'Session header is missing');
 
@@ -138,7 +138,7 @@ app.post('/sessions', async function(req, res, next) {
  * @return [400] If the session header is missing or invalid
 */
 app.delete('/sessions/current', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
+  const sessionUri = req.get('mu-session-id');
   if (!sessionUri)
     return error(res, 'Session header is missing');
 
@@ -162,7 +162,7 @@ app.delete('/sessions/current', async function(req, res, next) {
  * @return [400] If the session header is missing or invalid
 */
 app.get('/sessions/current', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
+  const sessionUri = req.get('mu-session-id');
   if (!sessionUri)
     return next(new Error('Session header is missing'));
 
