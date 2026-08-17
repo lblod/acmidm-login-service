@@ -1,14 +1,12 @@
 import { app } from 'mu';
 import { error } from './utils';
-import { saveLog } from './logs';
 import { getAccessToken } from './lib/openid';
-import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
-         ensureUserAndAccount, insertNewSessionForAccount,
-         selectAccountBySession, selectCurrentSession,
-         selectGroupByNumber, 
-         createEconomischeActorByClaims} from './lib/session';
+import { removeCurrentSession, selectAccountBySession, selectCurrentSession } from './lib/session';
 import request from 'request';
 import { GROUP_TYPE_LABEL } from './config';
+import { deleteOldSessions } from './lib/queries';
+import { organisationLoginStrategy } from './strategies/organisations';
+import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
 
 const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
 
@@ -44,14 +42,17 @@ requiredEnvironmentVariables.forEach(key => {
  * @return [403] If no bestuurseenheid can be linked to the session
 */
 app.post('/sessions', async function(req, res, next) {
+  /** Verify mu-session-id header is present */
   const sessionUri = req.get('mu-session-id');
   if (!sessionUri)
     return error(res, 'Session header is missing');
 
+  /** Verify authorizationCode header is present */
   const authorizationCode = req.body['authorizationCode'];
   if (!authorizationCode)
     return error(res, 'Authorization code is missing');
 
+  /** Try to get access token */
   try {
     let tokenSet;
     try {
@@ -61,7 +62,7 @@ app.post('/sessions', async function(req, res, next) {
       return res.status(401).end();
     }
 
-    await removeOldSessions(sessionUri);
+    await deleteOldSessions(sessionUri);
 
     const claims = tokenSet.claims();
 
@@ -72,36 +73,13 @@ app.post('/sessions', async function(req, res, next) {
     if (process.env['LOG_SINK_URL'])
       request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
-    let { groupUri, groupId } = await selectGroupByNumber(claims);
-
-    const isEconomischeActor = claims.vo_doelgroepcode == "EA"
-
-    if (!groupUri || !groupId) {
-      if(isEconomischeActor) {
-        await createEconomischeActorByClaims(claims);
-        ({ groupUri, groupId } = await selectGroupByNumber(claims));  
-
-
-        if (!groupUri || !groupId) {
-          console.log(`Error: GroupUri and GroupID are still empty even after creating them! Claims = ${JSON.stringify(claims)}`);
-          return res.header('mu-auth-allowed-groups', 'CLEAR').status(500).end();
-        }
-      } else {
-        console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
-        saveLog(
-          logsGraph,
-          `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
-          `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
-          sessionUri,
-          claims[groupIdClaim]);
-        return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
-      }
+    /** Strategies */
+    let sessionId, groupId, roles, accountId;
+    if (process.env.GROUP_TYPE_LABEL === 'organisation') {
+      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims));
+    } else {
+      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims));
     }
-
-    const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
-    const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
-
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
