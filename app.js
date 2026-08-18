@@ -1,10 +1,9 @@
 import { app } from 'mu';
 import { error } from './utils';
 import { getAccessToken } from './lib/openid';
-import { removeCurrentSession, selectAccountBySession, selectCurrentSession } from './lib/session';
+import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
 import request from 'request';
 import { GROUP_TYPE_LABEL } from './config';
-import { deleteOldSessions } from './lib/queries';
 import { organisationLoginStrategy } from './strategies/organisations';
 import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
 
@@ -62,7 +61,7 @@ app.post('/sessions', async function(req, res, next) {
       return res.status(401).end();
     }
 
-    await deleteOldSessions(sessionUri);
+    await deleteSessionById(sessionUri);
 
     const claims = tokenSet.claims();
 
@@ -125,7 +124,7 @@ app.delete('/sessions/current', async function(req, res, next) {
     if (!accountUri)
       return error(res, 'Invalid session');
 
-    await removeCurrentSession(sessionUri);
+    await deleteSessionById(sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
   } catch(e) {
