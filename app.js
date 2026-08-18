@@ -6,9 +6,6 @@ import request from 'request';
 import { GROUP_TYPE_LABEL } from './config';
 import { organisationLoginStrategy } from './strategies/organisations';
 import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
-
-const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
-
 /**
  * Configuration validation on startup
  */
@@ -75,9 +72,9 @@ app.post('/sessions', async function(req, res, next) {
     /** Strategies */
     let sessionId, groupId, roles, accountId;
     if (process.env.GROUP_TYPE_LABEL === 'organisation') {
-      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims));
+      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
     } else {
-      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims));
+      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
     }
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
