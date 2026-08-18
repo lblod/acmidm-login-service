@@ -1,7 +1,7 @@
 import { saveLog } from '../logs';
-import { groupIdClaim, roleClaim, selectGroupByNumber } from "../lib/session";
+import { selectGroupByNumber } from "../lib/session";
 
-import { ROLE_CLAIM } from '../config';
+import { GROUP_ID_CLAIM, ROLE_CLAIM } from '../config';
 
 
 export async function organisationLoginStrategy(claims) {
@@ -16,13 +16,13 @@ export async function organisationLoginStrategy(claims) {
   } 
 
   if (groupDoesNotExistForUser) {
-    console.log(`User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[roleClaim])}`);
+    console.log(`User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`);
     saveLog(
       logsGraph,
       `http://data.lblod.info/class-names/no-organisation-for-role`,
-      `User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[roleClaim])}`,
+      `User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
-      claims[groupIdClaim]);
+      claims[GROUP_ID_CLAIM]);
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
   }
 
@@ -36,8 +36,8 @@ export async function organisationLoginStrategy(claims) {
 }
 
 const _selectOrganisationByNumber = async function(claims) {
-  if (claims[groupIdClaim]) {
-    const identifier = claims[groupIdClaim];
+  if (claims[GROUP_ID_CLAIM]) {
+    const identifier = claims[GROUP_ID_CLAIM];
 
     const queryResult = await query(`
     PREFIX mu: <http://mu.semte.ch/vocabularies/core/>

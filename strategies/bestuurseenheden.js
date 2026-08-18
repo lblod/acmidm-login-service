@@ -1,3 +1,4 @@
+import { GROUP_ID_CLAIM, ROLE_CLAIM } from '../config';
 import { saveLog } from '../logs';
 
 export async function bestuurseenheidLoginStrategy(claims) {
@@ -5,19 +6,19 @@ export async function bestuurseenheidLoginStrategy(claims) {
   const groupDoesNotExistForUser = !groupUri || !groupId
 
   if (groupDoesNotExistForUser) {
-    console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
+    console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`);
     saveLog(
       logsGraph,
       `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
-      `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
+      `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
-      claims[groupIdClaim]);
+      claims[GROUP_ID_CLAIM]);
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
   }
 
   const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
 
-  const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
+  const roles = (claims[ROLE_CLAIM] || []).map(r => r.split(':')[0]);
 
   const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
 
@@ -25,8 +26,8 @@ export async function bestuurseenheidLoginStrategy(claims) {
 }
 
 const selectBestuurseenheidByNumber = async function(claims) {
-  if (claims[groupIdClaim]) {
-    const identifier = claims[groupIdClaim];
+  if (claims[GROUP_ID_CLAIM]) {
+    const identifier = claims[GROUP_ID_CLAIM];
 
     const queryResult = await query(`
     PREFIX mu: <http://mu.semte.ch/vocabularies/core/>
