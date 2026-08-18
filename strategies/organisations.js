@@ -1,10 +1,10 @@
+import { querySudo as query} from '@lblod/mu-auth-sudo';
+import { uuid, sparqlEscapeUri, sparqlEscapeString, sparqlEscapeDateTime } from 'mu';
 import { saveLog } from '../logs';
-import { selectGroupByNumber } from "../lib/session";
 
-import { GROUP_ID_CLAIM, ROLE_CLAIM } from '../config';
+import { GROUP_ID_CLAIM, LOGS_GRAPH, ROLE_CLAIM } from '../config';
 
-
-export async function organisationLoginStrategy(claims) {
+export async function organisationLoginStrategy(claims, sessionUri) {
   const { groupUri, groupId } = await _selectOrganisationByNumber(claims);
 
   const userIsEconomischeActor = claims.vo_doelgroepcode == "EA"
@@ -12,13 +12,13 @@ export async function organisationLoginStrategy(claims) {
 
   if (groupDoesNotExistForUser && userIsEconomischeActor) {
     await _createEconomischeActorByClaims(claims);
-    ({ groupUri, groupId } = await selectGroupByNumber(claims));  
+    ({ groupUri, groupId } = await _selectOrganisationByNumber(claims));  
   } 
 
   if (groupDoesNotExistForUser) {
     console.log(`User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`);
     saveLog(
-      logsGraph,
+      LOGS_GRAPH,
       `http://data.lblod.info/class-names/no-organisation-for-role`,
       `User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,

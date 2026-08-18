@@ -1,14 +1,17 @@
-import { GROUP_ID_CLAIM, ROLE_CLAIM } from '../config';
+import { querySudo as query} from '@lblod/mu-auth-sudo';
+import { sparqlEscapeUri, sparqlEscapeString } from 'mu';
 import { saveLog } from '../logs';
 
-export async function bestuurseenheidLoginStrategy(claims) {
+import { GROUP_ID_CLAIM, LOGS_GRAPH, ORGANIZATION_TYPE, ROLE_CLAIM } from '../config';
+
+export async function bestuurseenheidLoginStrategy(claims, sessionUri) {
   const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
   const groupDoesNotExistForUser = !groupUri || !groupId
 
   if (groupDoesNotExistForUser) {
     console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`);
     saveLog(
-      logsGraph,
+      LOGS_GRAPH,
       `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
       `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
