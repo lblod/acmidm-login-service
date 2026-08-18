@@ -69,13 +69,18 @@ app.post('/sessions', async function(req, res, next) {
     if (process.env['LOG_SINK_URL'])
       request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
-    /** Strategies */
-    let sessionId, groupId, roles, accountId;
-    if (process.env.GROUP_TYPE_LABEL === 'organisation') {
-      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
+    /** Strategy */
+    let sessionData;
+    if (GROUP_TYPE_LABEL === 'organisation') {
+      sessionData = await organisationLoginStrategy(claims, sessionUri);
     } else {
-      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
+      sessionData = await bestuurseenheidLoginStrategy(claims, sessionUri);
     }
+
+    if (!sessionData)
+      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
+
+    const { sessionId, groupId, accountId, roles } = sessionData;
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
@@ -100,7 +105,7 @@ app.post('/sessions', async function(req, res, next) {
       }
     });
   } catch(e) {
-    return next(new Error(e.message));
+    return next(e);
   }
 });
 

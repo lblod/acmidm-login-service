@@ -1,5 +1,6 @@
 import { querySudo as query} from '@lblod/mu-auth-sudo';
 import { sparqlEscapeUri, sparqlEscapeString } from 'mu';
+import { ensureUserAndAccount, insertNewSessionForAccount } from '../lib/session';
 import { saveLog } from '../logs';
 
 import { GROUP_ID_CLAIM, LOGS_GRAPH, ORGANIZATION_TYPE, ROLE_CLAIM } from '../config';
@@ -16,7 +17,7 @@ export async function bestuurseenheidLoginStrategy(claims, sessionUri) {
       `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
       claims[GROUP_ID_CLAIM]);
-    return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
+    return null;
   }
 
   const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
@@ -25,7 +26,7 @@ export async function bestuurseenheidLoginStrategy(claims, sessionUri) {
 
   const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
 
-  return { sessionId, groupId, roles,accountId };
+  return { sessionId, groupId, accountId, roles };
 }
 
 const selectBestuurseenheidByNumber = async function(claims) {

@@ -1,8 +1,9 @@
-import { querySudo as query} from '@lblod/mu-auth-sudo';
+import { querySudo as query, updateSudo as update } from '@lblod/mu-auth-sudo';
 import { uuid, sparqlEscapeUri, sparqlEscapeString, sparqlEscapeDateTime } from 'mu';
+import { ensureUserAndAccount, insertNewSessionForAccount } from '../lib/session';
 import { saveLog } from '../logs';
 
-import { GROUP_ID_CLAIM, LOGS_GRAPH, ROLE_CLAIM } from '../config';
+import { GROUP_ID_CLAIM, LOGS_GRAPH, ORGANIZATION_TYPE, ROLE_CLAIM } from '../config';
 
 export async function organisationLoginStrategy(claims, sessionUri) {
   const { groupUri, groupId } = await _selectOrganisationByNumber(claims);
@@ -32,7 +33,7 @@ export async function organisationLoginStrategy(claims, sessionUri) {
 
   const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
 
-  return { sessionId, groupId, roles };
+  return { sessionId, groupId, accountId, roles };
 }
 
 const _selectOrganisationByNumber = async function(claims) {
