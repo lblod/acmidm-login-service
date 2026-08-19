@@ -1,22 +1,22 @@
 import { app } from 'mu';
+import request from 'request';
 import { error } from './utils';
 import { getAccessToken } from './lib/openid';
 import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
-import request from 'request';
-import { GROUP_TYPE_LABEL } from './config';
+import {
+  DEBUG_LOG_TOKENSETS,
+  GROUP_TYPE_LABEL,
+  LOG_SINK_URL,
+  REQUIRED_CONFIGURATION
+} from './config';
 import { organisationLoginStrategy } from './strategies/organisations';
 import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
+
 /**
  * Configuration validation on startup
  */
-const requiredEnvironmentVariables = [
-  'MU_APPLICATION_AUTH_DISCOVERY_URL',
-  'MU_APPLICATION_AUTH_CLIENT_ID',
-  'MU_APPLICATION_AUTH_REDIRECT_URI'
-];
-
-requiredEnvironmentVariables.forEach(key => {
-  if (!process.env[key]) {
+Object.entries(REQUIRED_CONFIGURATION).forEach(([key, value]) => {
+  if (!value) {
     console.log(`Environment variable ${key} must be configured`);
     process.exit(1);
   }
@@ -57,12 +57,12 @@ app.post('/sessions', async function(req, res, next) {
 
     const claims = tokenSet.claims();
 
-    if (process.env['DEBUG_LOG_TOKENSETS']) {
+    if (DEBUG_LOG_TOKENSETS) {
       console.log(`Received tokenSet ${JSON.stringify(tokenSet)} including claims ${JSON.stringify(claims)}`);
     }
 
-    if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
+    if (LOG_SINK_URL)
+      request.post({ url: LOG_SINK_URL, body: tokenSet, json: true });
 
     /** Strategy */
     let sessionId, groupId, accountId, roles;
