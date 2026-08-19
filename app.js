@@ -14,6 +14,7 @@ const requiredEnvironmentVariables = [
   'MU_APPLICATION_AUTH_CLIENT_ID',
   'MU_APPLICATION_AUTH_REDIRECT_URI'
 ];
+
 requiredEnvironmentVariables.forEach(key => {
   if (!process.env[key]) {
     console.log(`Environment variable ${key} must be configured`);
@@ -38,27 +39,21 @@ requiredEnvironmentVariables.forEach(key => {
  * @return [403] If no bestuurseenheid can be linked to the session
 */
 app.post('/sessions', async function(req, res, next) {
-  /** Verify mu-session-id header is present */
-  const sessionUri = req.get('mu-session-id');
-  if (!sessionUri)
-    return error(res, 'Session header is missing');
-
-  /** Verify authorizationCode header is present */
-  const authorizationCode = req.body['authorizationCode'];
-  if (!authorizationCode)
-    return error(res, 'Authorization code is missing');
-
-  /** Try to get access token */
   try {
-    let tokenSet;
-    try {
-      tokenSet = await getAccessToken(authorizationCode);
-    } catch(e) {
-      console.log(`Failed to retrieve access token for authorization code: ${e.message || e}`);
-      return res.status(401).end();
-    }
+    /** Guard clauses for missing headers */
+    const sessionUri = getSessionIdHeader(req);
+    if (!sessionUri)
+      return httpError(400, 'Session header is missing');
+  
+    const authorizationCode = req.body['authorizationCode'];
+    if (!authorizationCode)
+      return httpError(400, 'Authorization code is missing');
 
-    await deleteSessionById(sessionUri);
+    /** Retrieve the access token */
+    const tokenSet = await getAccessToken(authorizationCode);
+
+    /** Make sure there are no old sessions for this account */
+    await removeOldSessions(sessionUri);
 
     const claims = tokenSet.claims();
 
@@ -70,17 +65,13 @@ app.post('/sessions', async function(req, res, next) {
       request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
 
     /** Strategy */
-    let sessionData;
+    let sessionId, groupId, accountId, roles;
+
     if (GROUP_TYPE_LABEL === 'organisation') {
-      sessionData = await organisationLoginStrategy(claims, sessionUri);
+      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
     } else {
-      sessionData = await bestuurseenheidLoginStrategy(claims, sessionUri);
+      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
     }
-
-    if (!sessionData)
-      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
-
-    const { sessionId, groupId, accountId, roles } = sessionData;
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
