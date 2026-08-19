@@ -1,12 +1,12 @@
 import { querySudo as query, updateSudo as update } from '@lblod/mu-auth-sudo';
 import { uuid, sparqlEscapeUri, sparqlEscapeString, sparqlEscapeDateTime } from 'mu';
-import { ensureUserAndAccount, insertNewSessionForAccount } from '../lib/session';
+import { ensureUserAndAccount, insertNewSessionForAccount, selectGroupByNumber } from '../lib/session';
 import { saveLog } from '../logs';
 
 import { GROUP_ID_CLAIM, LOGS_GRAPH, ORGANIZATION_TYPE, ROLE_CLAIM } from '../config';
 
 export async function organisationLoginStrategy(claims, sessionUri) {
-  const { groupUri, groupId } = await _selectOrganisationByNumber(claims);
+  let { groupUri, groupId } = await selectGroupByNumber(claims);
 
   const userIsEconomischeActor = claims.vo_doelgroepcode == "EA"
   const groupDoesNotExistForUser = !groupUri || !groupId
@@ -35,31 +35,6 @@ export async function organisationLoginStrategy(claims, sessionUri) {
 
   return { sessionId, groupId, accountId, roles };
 }
-
-const _selectOrganisationByNumber = async function(claims) {
-  if (claims[GROUP_ID_CLAIM]) {
-    const identifier = claims[GROUP_ID_CLAIM];
-
-    const queryResult = await query(`
-    PREFIX mu: <http://mu.semte.ch/vocabularies/core/>
-    PREFIX dcterms: <http://purl.org/dc/terms/>
-
-    SELECT ?group ?groupId
-    FROM <${process.env.MU_APPLICATION_GRAPH}>
-    WHERE {
-      ?group a ${sparqlEscapeUri(ORGANIZATION_TYPE)} ;
-             mu:uuid ?groupId ;
-             dcterms:identifier ${sparqlEscapeString(identifier)} .
-    }`);
-
-    if (queryResult.results.bindings.length) {
-      const result = queryResult.results.bindings[0];
-      return { groupUri: result.group.value, groupId: result.groupId.value };
-    }
-  }
-
-  return { groupUri: null, groupId: null };
-};
 
 const _createEconomischeActorByClaims = async function(claims) {
   const now = new Date();
