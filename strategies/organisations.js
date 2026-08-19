@@ -11,12 +11,11 @@ export async function organisationLoginStrategy(claims, sessionUri) {
   const userIsEconomischeActor = claims.vo_doelgroepcode == "EA"
   const groupDoesNotExistForUser = !groupUri || !groupId
 
-  if (groupDoesNotExistForUser && userIsEconomischeActor) {
+  if (!groupDoesNotExistForUser) {
+    if (userIsEconomischeActor)
     await _createEconomischeActorByClaims(claims);
-    ({ groupUri, groupId } = await _selectOrganisationByNumber(claims));  
-  } 
-
-  if (groupDoesNotExistForUser) {
+    ({ groupUri, groupId } = await selectGroupByNumber(claims));  
+  } else {
     console.log(`User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`);
     saveLog(
       LOGS_GRAPH,
@@ -26,8 +25,9 @@ export async function organisationLoginStrategy(claims, sessionUri) {
       claims[GROUP_ID_CLAIM]);
     return httpError(403, '', { 'mu-auth-allowed-groups': 'CLEAR' })
   }
-
-  const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
+  
+  const accountIdentifier = claims[ACCOUNT_ID_CLAIM] ?? claims["sub"];
+  const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId, accountIdentifier);
 
   const roles = (claims[ROLE_CLAIM] || []).map(r => r.split(':')[0]);
 
