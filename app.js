@@ -185,6 +185,113 @@ app.get('/sessions/current', async function(req, res, next) {
   }
 });
 
+/**
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!! DEBUG ONLY   !!!!!!!!!!!!!!!!!!!!!!!!!!!
+ * !!!!!!!!!!!!!!!!!!!!!!!!!!! DON'T EXPOSE !!!!!!!!!!!!!!!!!!!!!!!!!!!
+ *
+ * You can use this endpoint and come very close to impersonating a user logged in through ACM.
+ * By submitting the decoded claims, you'll be able to get a session for this users.
+ * You'll find these decoded claims in the logs when someone logs in through ACM.
+ * Once you have these, it's a literal copy/paste POST request
+ * You'll need wiring in dispatcher to make this thing work.
+ *
+ *  match "/debug/sessions/*path", @json do
+ *    Proxy.forward conn, path, "http://login/debug/sessions/"
+ *  end
+ *
+ *  Also using it through the frontend, you will need to spoof it:
+ *    see: https://cloud.ruizdearcaute.com/s/AATJdEoLaGNdZBx
+ *
+ * Be cautious. Know what you are doing...
+ *
+ * Log the user in by creating a new session, i.e. attaching the user's account to a session.
+ *
+ *
+ * Example Body:
+ *    {
+ *     "some_rol_2d": [
+ *       "SOME_ROLE:OVO_CODE"
+ *     ],
+ *     "at_hash": "STUB_DATA",
+ *     "aud": "STUB_DATA",
+ *     "azp": "STUB_DATA",
+ *     "cot": "STUB_DATA",
+ *     "exp": STUB_DATA,
+ *     "family_name": "Doe",
+ *     "given_name": "John",
+ *     "iat": STUB_DATA,
+ *     "iss": "STUB_DATA",
+ *     "kid": "STUB_DATA",
+ *     "sub": "STUB_DATA",
+ *     "vo_doelgroepcode": "STUB_DATA",
+ *     "vo_email": "john.doe@example.com",
+ *     "vo_orgcode": "STUB_DATA",
+ *     "vo_orgnaam": "STUB_DATA"
+ *    }
+ *
+ * @return [201] On successful login containing the newly created session
+ * @return [403] If no bestuurseenheid can be linked to the session
+*/
+// NOTE: only works with Content-Type: application/vnd.api+json
+app.post('/debug/sessions/claims', async function(req, res, next) {
+  const sessionUri = getSessionIdHeader(req);
+  if (!sessionUri)
+    return error(res, 'Session header is missing');
+
+  try {
+    await removeOldSessions(sessionUri);
+
+    const claims = req.body;
+
+    if (process.env['DEBUG_LOG_TOKENSETS']) {
+      console.log(`Received claims to DEBUG: ${JSON.stringify(claims)}`);
+    }
+
+    const { groupUri, groupId } = await selectBestuurseenheidByNumber(claims);
+
+    if (!groupUri || !groupId) {
+      console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
+      saveLog(
+        logsGraph,
+        `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
+        `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
+        sessionUri,
+        claims[groupIdClaim]);
+      return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
+    }
+
+    const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
+    const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
+
+    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
+
+    return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
+      links: {
+        self: '/sessions/current'
+      },
+      data: {
+        type: 'sessions',
+        id: sessionId,
+        attributes: {
+          roles: roles
+        }
+      },
+      relationships: {
+        account: {
+          links: { related: `/accounts/${accountId}` },
+          data: { type: 'accounts', id: accountId }
+        },
+        group: {
+          links: { related: `/bestuurseenheden/${groupId}` },
+          data: { type: 'bestuurseenheden', id: groupId }
+        }
+      }
+    });
+  } catch(e) {
+    return next(new Error(e.message));
+  }
+});
+
 
 /**
  * Error handler translating thrown Errors to 500 HTTP responses
