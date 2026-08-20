@@ -25,7 +25,7 @@ export async function organisationLoginStrategy(claims, sessionUri) {
       `User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
       claims[GROUP_ID_CLAIM]);
-    return httpError(403, '', { 'mu-auth-allowed-groups': 'CLEAR' });
+    throw httpError(403, '', { 'mu-auth-allowed-groups': 'CLEAR' });
   }
   
   const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);

@@ -43,11 +43,11 @@ app.post('/sessions', async function(req, res, next) {
     /** Guard clauses for missing headers */
     const sessionUri = req.get('mu-session-id');
     if (!sessionUri)
-      return httpError(400, 'Session header is missing');
+      throw httpError(400, 'Session header is missing');
   
     const authorizationCode = req.body['authorizationCode'];
     if (!authorizationCode)
-      return httpError(400, 'Authorization code is missing');
+      throw httpError(400, 'Authorization code is missing');
 
     /** Retrieve the access token */
     const tokenSet = await getAccessToken(authorizationCode);
@@ -108,20 +108,20 @@ app.post('/sessions', async function(req, res, next) {
  * @return [400] If the session header is missing or invalid
 */
 app.delete('/sessions/current', async function(req, res, next) {
-  const sessionUri = req.get('mu-session-id');
-  if (!sessionUri)
-    return httpError(400, 'Session header is missing');
-
   try {
+    const sessionUri = req.get('mu-session-id');
+    if (!sessionUri)
+      throw httpError(400, 'Session header is missing');
+
     const { accountUri } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return httpError(400, 'Invalid session');
+      throw httpError(400, 'Invalid session');
 
     await deleteSessionById(sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
   } catch(e) {
-    return next(new Error(e.message));
+    return next(e);
   }
 });
 
@@ -132,14 +132,14 @@ app.delete('/sessions/current', async function(req, res, next) {
  * @return [400] If the session header is missing or invalid
 */
 app.get('/sessions/current', async function(req, res, next) {
-  const sessionUri = req.get('mu-session-id');
-  if (!sessionUri)
-    return next(new Error('Session header is missing'));
-
   try {
+    const sessionUri = req.get('mu-session-id');
+    if (!sessionUri)
+      throw httpError(400, 'Session header is missing');
+
     const { accountUri, accountId } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return httpError(400, 'Invalid session');
+      throw httpError(400, 'Invalid session');
 
     const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
@@ -166,17 +166,19 @@ app.get('/sessions/current', async function(req, res, next) {
       }
     });
   } catch(e) {
-    return next(new Error(e.message));
+    return next(e);
   }
 });
 
 
 /**
- * Error handler translating thrown Errors to 500 HTTP responses
+ * Error handler translating thrown errors to HTTP responses
 */
 app.use(function(err, req, res, next) {
   console.log(`Error: ${err.message}`);
-  res.status(500);
+  if (err.headers)
+    res.set(err.headers);
+  res.status(err.status || 500);
   res.json({
     errors: [ {title: err.message} ]
   });
