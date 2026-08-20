@@ -22,25 +22,22 @@ Object.entries(REQUIRED_CONFIGURATION).forEach(([key, value]) => {
   }
 });
 
-/**
- * Log the user in by creating a new session, i.e. attaching the user's account to a session.
- *
- * Before creating a new session, the given authorization code gets exchanged for an access token
- * with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token
- * is decoded to retrieve information to attach to the user, account and the session.
- * If the OpenID Provider returns a valid access token, a new user and account are created if they
- * don't exist yet and a the account is attached to the session.
+/*
+ * Create a session:
+ * - exchange the authorization code
+ * - remove the previous session
+ * - delegate group-specific login work
  *
  * Body: { authorizationCode: "secret" }
  *
- * @return [201] On successful login containing the newly created session
- * @return [400] If the session header or authorization code is missing
- * @return [401] On login failure (unable to retrieve a valid access token)
- * @return [403] If no bestuurseenheid can be linked to the session
-*/
+ * Returns:
+ * - [201] Newly created session
+ * - [400] Missing session header or authorization code
+ * - [401] Invalid authorization code or failed token exchange
+ * - [403] No matching group
+ */
 app.post('/sessions', async function(req, res, next) {
   try {
-    /** Guard clauses for missing headers */
     const sessionUri = req.get('mu-session-id');
     if (!sessionUri)
       throw httpError(400, 'Session header is missing');
@@ -49,10 +46,8 @@ app.post('/sessions', async function(req, res, next) {
     if (!authorizationCode)
       throw httpError(400, 'Authorization code is missing');
 
-    /** Retrieve the access token */
     const tokenSet = await getAccessToken(authorizationCode);
 
-    /** Make sure there are no old sessions for this account */
     await deleteSessionById(sessionUri);
 
     const claims = tokenSet.claims();
@@ -64,7 +59,6 @@ app.post('/sessions', async function(req, res, next) {
     if (LOG_SINK_URL)
       request.post({ url: LOG_SINK_URL, body: tokenSet, json: true });
 
-    /** Strategy */
     let sessionId, groupId, accountId, roles;
 
     if (GROUP_TYPE_LABEL === 'organization' || GROUP_TYPE_LABEL === 'organisation') {
@@ -100,13 +94,13 @@ app.post('/sessions', async function(req, res, next) {
   }
 });
 
-
-/**
- * Log out from the current session, i.e. detaching the session from the user's account.
+/*
+ * Remove the current session after checking that it belongs to an account.
  *
- * @return [204] On successful logout
- * @return [400] If the session header is missing or invalid
-*/
+ * Returns:
+ * - [204] Session removed
+ * - [400] Missing session header or invalid session
+ */
 app.delete('/sessions/current', async function(req, res, next) {
   try {
     const sessionUri = req.get('mu-session-id');
@@ -125,12 +119,13 @@ app.delete('/sessions/current', async function(req, res, next) {
   }
 });
 
-/**
- * Get the current session
+/*
+ * Find the current session and return the standard session response.
  *
- * @return [200] The current session
- * @return [400] If the session header is missing or invalid
-*/
+ * Returns:
+ * - [200] Current session
+ * - [400] Missing session header or invalid session
+ */
 app.get('/sessions/current', async function(req, res, next) {
   try {
     const sessionUri = req.get('mu-session-id');
@@ -170,10 +165,7 @@ app.get('/sessions/current', async function(req, res, next) {
   }
 });
 
-
-/**
- * Error handler translating thrown errors to HTTP responses
-*/
+/* Convert application errors to JSON:API error responses. */
 app.use(function(err, req, res, next) {
   console.log(`Error: ${err.message}`);
   if (err.headers)

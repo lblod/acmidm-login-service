@@ -1,10 +1,11 @@
 import { updateSudo as update } from '@lblod/mu-auth-sudo';
 import { sparqlEscapeString, sparqlEscapeUri, sparqlEscapeDateTime, uuid } from 'mu';
 
-/**
- * Save the log into the database.
-*/
-const saveLog = async function(logsGraph, classNameUri, message, sessionUri, kbonummer) {
+/*
+ * Store a log entry with session and group context.
+ * Keep `kbonummer` for existing log consumers.
+ */
+const saveLog = async function(logsGraphUri, logClassUri, message, sessionUri, groupIdentifier) {
   const logEntryUuid = uuid();
   const logEntryUri = "http://data.lblod.info/id/log-entries/".concat(logEntryUuid);
 
