@@ -54,7 +54,7 @@ const _createEconomischeActorByClaims = async function(claims) {
     PREFIX org: <http://www.w3.org/ns/org#>
 
     INSERT DATA {
-      GRAPH <http://mu.semte.ch/graphs/public> {
+      GRAPH ${sparqlEscapeUri(APPLICATION_GRAPH)} {
         ${sparqlEscapeUri(orgUri)} a org:Organization ;
             mu:uuid ${sparqlEscapeString(orgUuid)};
             skos:prefLabel ${sparqlEscapeString(claims.vo_orgnaam)} ;
