@@ -39,8 +39,8 @@ app.post('/sessions', async function(req, res, next) {
     const sessionUri = req.get('mu-session-id');
     if (!sessionUri)
       throw httpError(400, 'Session header is missing');
-  
-    const authorizationCode = req.body['authorizationCode'];
+
+    const authorizationCode = req.body.authorizationCode;
     if (!authorizationCode)
       throw httpError(400, 'Authorization code is missing');
 
@@ -87,7 +87,7 @@ app.post('/sessions', async function(req, res, next) {
         }
       }
     });
-  } catch(e) {
+  } catch (e) {
     return next(e);
   }
 });
@@ -112,7 +112,7 @@ app.delete('/sessions/current', async function(req, res, next) {
     await deleteSessionById(sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
-  } catch(e) {
+  } catch (e) {
     return next(e);
   }
 });
@@ -158,7 +158,7 @@ app.get('/sessions/current', async function(req, res, next) {
         }
       }
     });
-  } catch(e) {
+  } catch (e) {
     return next(e);
   }
 });
@@ -170,6 +170,6 @@ app.use(function(err, req, res, next) {
     res.set(err.headers);
   res.status(err.status || 500);
   res.json({
-    errors: [ {title: err.message} ]
+    errors: [{ title: err.message }]
   });
 });
