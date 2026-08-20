@@ -12,12 +12,10 @@ import {
 import { organisationLoginStrategy } from './strategies/organisations';
 import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
 
-/**
- * Configuration validation on startup
- */
-Object.entries(REQUIRED_CONFIGURATION).forEach(([key, value]) => {
+/* Exit during startup when a required OpenID setting is missing. */
+Object.entries(REQUIRED_CONFIGURATION).forEach(([environmentVariable, value]) => {
   if (!value) {
-    console.log(`Environment variable ${key} must be configured`);
+    console.log(`Environment variable ${environmentVariable} must be configured`);
     process.exit(1);
   }
 });
