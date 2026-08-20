@@ -1,6 +1,6 @@
 import { app } from 'mu';
 import request from 'request';
-import { error } from './utils';
+import { httpError } from './utils';
 import { getAccessToken } from './lib/openid';
 import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
 import {
@@ -41,7 +41,7 @@ Object.entries(REQUIRED_CONFIGURATION).forEach(([key, value]) => {
 app.post('/sessions', async function(req, res, next) {
   try {
     /** Guard clauses for missing headers */
-    const sessionUri = getSessionIdHeader(req);
+    const sessionUri = req.get('mu-session-id');
     if (!sessionUri)
       return httpError(400, 'Session header is missing');
   
@@ -53,7 +53,7 @@ app.post('/sessions', async function(req, res, next) {
     const tokenSet = await getAccessToken(authorizationCode);
 
     /** Make sure there are no old sessions for this account */
-    await removeOldSessions(sessionUri);
+    await deleteSessionById(sessionUri);
 
     const claims = tokenSet.claims();
 
@@ -67,7 +67,7 @@ app.post('/sessions', async function(req, res, next) {
     /** Strategy */
     let sessionId, groupId, accountId, roles;
 
-    if (GROUP_TYPE_LABEL === 'organisation') {
+    if (GROUP_TYPE_LABEL === 'organization' || GROUP_TYPE_LABEL === 'organisation') {
       ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
     } else {
       ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
@@ -110,12 +110,12 @@ app.post('/sessions', async function(req, res, next) {
 app.delete('/sessions/current', async function(req, res, next) {
   const sessionUri = req.get('mu-session-id');
   if (!sessionUri)
-    return error(res, 'Session header is missing');
+    return httpError(400, 'Session header is missing');
 
   try {
     const { accountUri } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return error(res, 'Invalid session');
+      return httpError(400, 'Invalid session');
 
     await deleteSessionById(sessionUri);
 
@@ -139,7 +139,7 @@ app.get('/sessions/current', async function(req, res, next) {
   try {
     const { accountUri, accountId } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return error(res, 'Invalid session');
+      return httpError(400, 'Invalid session');
 
     const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
