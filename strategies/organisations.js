@@ -2,6 +2,7 @@ import { querySudo as query, updateSudo as update } from '@lblod/mu-auth-sudo';
 import { uuid, sparqlEscapeUri, sparqlEscapeString, sparqlEscapeDateTime } from 'mu';
 import { ensureUserAndAccount, insertNewSessionForAccount, selectGroupByNumber } from '../lib/session';
 import { saveLog } from '../logs';
+import { httpError } from '../utils';
 
 import { GROUP_ID_CLAIM, LOGS_GRAPH, ORGANIZATION_TYPE, ROLE_CLAIM } from '../config';
 
@@ -23,7 +24,7 @@ export async function organisationLoginStrategy(claims, sessionUri) {
       `User is not allowed to login. No organisation found for roles ${JSON.stringify(claims[ROLE_CLAIM])}`,
       sessionUri,
       claims[GROUP_ID_CLAIM]);
-    return httpError(403, '', { 'mu-auth-allowed-groups': 'CLEAR' })
+    return httpError(403, '', { 'mu-auth-allowed-groups': 'CLEAR' });
   }
   
   const accountIdentifier = claims[ACCOUNT_ID_CLAIM] ?? claims["sub"];
