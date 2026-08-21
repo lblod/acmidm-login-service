@@ -7,8 +7,7 @@ import {
   DEBUG_LOG_TOKENSETS,
   GROUP_TYPE_LABEL,
   LOG_SINK_URL,
-  REQUIRED_CONFIGURATION,
-  SUPPORTED_GROUP_TYPE_LABELS
+  REQUIRED_CONFIGURATION
 } from './config';
 import { organisationLoginStrategy } from './strategies/organisations';
 import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
@@ -21,8 +20,9 @@ Object.entries(REQUIRED_CONFIGURATION).forEach(([environmentVariable, value]) =>
   }
 });
 
-if (!SUPPORTED_GROUP_TYPE_LABELS.includes(GROUP_TYPE_LABEL)) {
-  console.log(`Environment variable GROUP_TYPE_LABEL must be one of: ${SUPPORTED_GROUP_TYPE_LABELS.join(', ')}`);
+/* Exit during startup when GROUP_TYPE_LABEL is not 'bestuurseenheden' or 'organizations'. */
+if (GROUP_TYPE_LABEL !== 'bestuurseenheden' && GROUP_TYPE_LABEL !== 'organizations') {
+  console.log('Environment variable GROUP_TYPE_LABEL must be one of: bestuurseenheden, organizations');
   process.exit(1);
 }
 
