@@ -129,7 +129,7 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 | `ACCOUNT_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for accounts in each group; `{{groupId}}` is optional. |
 | `SESSION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/sessions` | Graph for sessions. |
 | `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group. |
-| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. Use `organizations` for organization mode. |
+| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. Allowed values are `bestuurseenheden` and `organizations`; use `organizations` for organization mode. |
 | `ENABLE_EMAIL_CLAIM` | No | Boolean | `false` | Enables storage of the `vo_email` claim only when set to `true`. |
 | `LOGS_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph for rejected-login log entries. |
 | `DEBUG_LOG_TOKENSETS` | No | String | — | Enables token-set and claim logging; any set value, including `false`, enables it. |
