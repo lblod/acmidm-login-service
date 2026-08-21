@@ -1,5 +1,5 @@
 {
-  "version": "0.1",
+  "version": "0.3",
   "scripts": [
     {
       "documentation": {
@@ -11,6 +11,39 @@
         "image": "semtech/mu-python-template:2.0.0-beta.2",
         "interactive": false,
         "script": "generate-jwk/run.sh"
+      }
+    },
+    {
+      "documentation": {
+        "command": "test",
+        "description": "Run the integration test suites in the service container",
+        "arguments": []
+      },
+      "environment": {
+        "interactive": false,
+        "script": "test/run.sh"
+      },
+      "mounts": {
+        "host": "/usr/bin/host"
+      },
+      "permissions": {
+        "host": [
+          {
+            "name": "list-compose-containers",
+            "comment": "List running containers in the current Compose project",
+            "command": "^docker compose ps -q$"
+          },
+          {
+            "name": "inspect-test-container",
+            "comment": "Check which Compose container has this service mounted",
+            "command": "^docker exec [0-9a-f]+ test -f /app/(package.json|tests/(config|shared)\\.js|tests/cases/(bestuurseenheid|organisation|current-session)\\.js)$"
+          },
+          {
+            "name": "run-integration-tests",
+            "comment": "Run this service's integration tests in its container",
+            "command": "^docker exec -w /app [0-9a-f]+ npm test$"
+          }
+        ]
       }
     }
   ]
