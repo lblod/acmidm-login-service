@@ -36,7 +36,7 @@ docker compose restart dispatcher
 
 ## Choose a group mode
 
-By default, the service looks up only `besluit:Bestuurseenheid` groups. Use the organisation strategy when organisations are the main group type in your application. This supports verenigingen, other organisation types, and bestuurseenheden when they use the selected main group type.
+By default, the service looks up only `besluit:Bestuurseenheid` groups. Use the organization strategy when organizations are the main group type in your application. This supports verenigingen, other organization types, and bestuurseenheden when they use the selected main group type.
 
 ### Bestuurseenheden (Support login for bestuurseenheden)
 
@@ -53,16 +53,16 @@ login:
 
 The service finds a matching bestuurseenheid in `MU_APPLICATION_GRAPH` by the configured group-ID claim. The group must already exist. If it does not, login fails with `403 Forbidden`.
 
-### Organisations (Supports login for verenigingen, EA's, bestuurseenheden...)
+### Organizations (Supports login for verenigingen, EA's, bestuurseenheden...)
 
-Set `GROUP_TYPE_LABEL` to `organisation` to use the organisation strategy. Set `ORGANIZATION_TYPE` to the RDF class of the main group type:
+Set `GROUP_TYPE_LABEL` to `organizations` to use the organization strategy. Set `ORGANIZATION_TYPE` to the RDF class of the main group type:
 
 ```yml
 login:
   image: lblod/acmidm-login-service
   environment:
     # OpenID settings from Quick setup
-    GROUP_TYPE_LABEL: "organisation"
+    GROUP_TYPE_LABEL: "organizations"
     ORGANIZATION_TYPE: "http://www.w3.org/ns/org#Organization"
 ```
 
@@ -124,12 +124,12 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 | `MU_APPLICATION_AUTH_GROUPID_CLAIM` | No | String | `vo_orgcode` | Claim used to match a group. |
 | `MU_APPLICATION_AUTH_ROLE_CLAIM` | No | String | `abb_loketLB_rol_3d` | Claim that holds session roles. |
 | `MU_APPLICATION_RESOURCE_BASE_URI` | No | URI | `http://data.lblod.info/` | Prefix for new user, account, and identifier URIs. |
-| `MU_APPLICATION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph searched for groups and used for new economic-actor organisations. |
+| `MU_APPLICATION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph searched for groups and used for new economic-actor organizations. |
 | `USER_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for users in each group; `{{groupId}}` is optional. |
 | `ACCOUNT_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for accounts in each group; `{{groupId}}` is optional. |
 | `SESSION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/sessions` | Graph for sessions. |
 | `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group. |
-| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. |
+| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. Use `organizations` for organization mode. |
 | `ENABLE_EMAIL_CLAIM` | No | Boolean | `false` | Enables storage of the `vo_email` claim only when set to `true`. |
 | `LOGS_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph for rejected-login log entries. |
 | `DEBUG_LOG_TOKENSETS` | No | String | — | Enables token-set and claim logging; any set value, including `false`, enables it. |
@@ -200,7 +200,7 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 
 ##### Class
 
-The RDF class set by `ORGANIZATION_TYPE`: `besluit:Bestuurseenheid` by default, or the main group class in organisation mode.
+The RDF class set by `ORGANIZATION_TYPE`: `besluit:Bestuurseenheid` by default, or the main group class in organization mode.
 
 #### Session
 
@@ -223,7 +223,7 @@ Logs the user in and creates a session. The service exchanges the supplied autho
 
 The configured user-ID and group-ID claims are needed for a successful login. The configured account-ID claim is optional when ACM/IDM supplies `sub`. Given name, family name, audience fields, and roles are optional. Email is stored only when `ENABLE_EMAIL_CLAIM` is `true`. Roles are stored without the text after `:`.
 
-In organisation mode, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
+In organization mode, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
 
 ##### Request body
 
@@ -273,7 +273,7 @@ On successful login with the newly created session in the response body:
 }
 ```
 
-For organisation mode, the group link and type use `organisation` instead.
+For organization mode, the group link and type use `organizations` instead.
 
 ###### 400 Bad Request
 
@@ -322,4 +322,3 @@ More information on the OpenID Connect integration with ACM/IDM can be found on 
 Currently this service supports 2 of the authentication methods (see 'How-to guides')
 1. Authentication using client ID and secret via basic auth
 2. Authentication using a JWT token with an RSA256 public/private key
-

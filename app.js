@@ -59,7 +59,7 @@ app.post('/sessions', async function(req, res, next) {
 
     let sessionId, groupId, accountId, roles;
 
-    if (GROUP_TYPE_LABEL === 'organization' || GROUP_TYPE_LABEL === 'organisation') {
+    if (GROUP_TYPE_LABEL === 'organizations') {
       ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
     } else {
       ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
