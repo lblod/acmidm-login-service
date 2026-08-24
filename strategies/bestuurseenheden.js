@@ -18,7 +18,7 @@ export async function bestuurseenheidLoginStrategy(claims, sessionUri) {
     const logMessage = `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(rolesFromClaims)}`;
 
     console.log(logMessage);
-    saveLog(
+    await saveLog(
       LOGS_GRAPH,
       `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
       logMessage,
