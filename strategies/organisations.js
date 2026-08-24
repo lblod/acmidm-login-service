@@ -29,7 +29,7 @@ export async function organisationLoginStrategy(claims, sessionUri) {
     const logMessage = `User is not allowed to login. No organisation found for roles ${JSON.stringify(rolesFromClaims)}`;
 
     console.log(logMessage);
-    saveLog(
+    await saveLog(
       LOGS_GRAPH,
       `http://data.lblod.info/class-names/no-organisation-for-role`,
       logMessage,
