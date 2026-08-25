@@ -43,8 +43,9 @@ if (GROUP_TYPE_LABEL !== 'bestuurseenheden' && GROUP_TYPE_LABEL !== 'organizatio
 app.post('/sessions', async function(req, res, next) {
   try {
     const sessionUri = req.get('mu-session-id');
+    // Technically 400 would be better. But we don't want to break the current clients
     if (!sessionUri)
-      throw httpError(400, 'Session header is missing');
+      throw httpError(500, 'Session header is missing');
 
     const authorizationCode = req.body.authorizationCode;
     if (!authorizationCode)
