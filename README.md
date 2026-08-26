@@ -1,52 +1,91 @@
 # ACM/IDM login microservice
-Microservice running on [mu.semte.ch](http://mu.semte.ch) providing the necessary endpoints to login/logout a user using [ACM/IDM as OpenId provider](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/). This backend service works together with [`@lblod/ember-acmidm-login`](https://github.com/lblod/ember-acmidm-login) in the frontend.
 
-## Tutorials
-### Add the login service to a stack
-Add the following snippet to your `docker-compose.yml` to include the login service in your application stack:
+This [mu.semte.ch](http://mu.semte.ch) service creates and removes user sessions with [ACM/IDM as its OpenID Connect provider](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/). It works with [`@lblod/ember-acmidm-login`](https://github.com/lblod/ember-acmidm-login) in the front end.
+
+## Quick setup
+
+Add this service to a mu stack that has an identifier, dispatcher, and triplestore. Replace the sample values with the values from ACM/IDM.
 
 ```yml
-login:
-  image: lblod/acmidm-login-service
-  environment:
+services:
+  login:
+    image: lblod/acmidm-login-service
+    environment:
       MU_APPLICATION_AUTH_DISCOVERY_URL: "https://authenticatie.vlaanderen.be/op/.well-known/openid-configuration"
       MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
       MU_APPLICATION_AUTH_REDIRECT_URI: "https://myapp.vlaanderen.be/authorization/callback"
-      MU_APPLICATION_AUTH_CLIENT_SECRET: "my-secret"
+      MU_APPLICATION_AUTH_CLIENT_SECRET: "my-client-secret"
 ```
 
-Fill in the environment variables with the information you received from ACM/IDM. 
+Keep `MU_APPLICATION_AUTH_CLIENT_SECRET` out of tracked files. Put it in `docker-compose.override.yml` or your deployment secret store.
 
-Add rules to the `dispatcher.ex` to dispatch requests to the login service. E.g.
+Add a dispatcher rule for the service:
 
 ```elixir
-  match "/sessions/*path" do
-    Proxy.forward conn, path, "http://login/sessions/"
-  end
+match "/sessions/*path" do
+  Proxy.forward conn, path, "http://login/sessions/"
+end
 ```
-The host `login` in the forward URL reflects the name of the login service in the `docker-compose.yml` file as defined above.
 
-Restart the `dispatcher` service and create the login service:
+`login` must match the Compose service name. Start the service and reload the dispatcher:
+
 ```bash
-docker compose restart dispatcher
 docker compose up -d login
+docker compose restart dispatcher
 ```
-## How-to guides
-### Authenticate using client id and secret
-To authenticate using a client ID and secret, simply configure the `MU_APPLICATION_AUTH_CLIENT_ID` and `MU_APPLICATION_AUTH_CLIENT_SECRET` environments variables on the service:
+
+## Choose a group mode
+
+By default, the service looks up only `besluit:Bestuurseenheid` groups. Use the organization strategy when organizations are the main group type in your application. This supports verenigingen, other organization types, and bestuurseenheden when they use the selected main group type.
+
+### Bestuurseenheden (Support login for bestuurseenheden)
+
+This is the default mode. Do not set `GROUP_TYPE_LABEL` or `ORGANIZATION_TYPE` unless your stack needs different values.
 
 ```yml
 login:
   image: lblod/acmidm-login-service
   environment:
-      MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
-      MU_APPLICATION_AUTH_CLIENT_SECRET: "my-secret"
+    # OpenID settings from Quick setup
+    GROUP_TYPE_LABEL: "bestuurseenheden"
+    ORGANIZATION_TYPE: "http://data.vlaanderen.be/ns/besluit#Bestuurseenheid"
 ```
 
-Make sure to keep the client secret private (e.g. don't commit it in your code repository). Therefore this environment variable is typcially set in `docker-compose.override.yml`.
+The service finds a matching bestuurseenheid in `MU_APPLICATION_GRAPH` by the configured group-ID claim. The group must already exist. If it does not, login fails with `403 Forbidden`.
 
-### Authenticate using JWT with public/private key
+### Organizations (Supports login for verenigingen, EA's, bestuurseenheden...)
+
+Set `GROUP_TYPE_LABEL` to `organizations` to use the organization strategy. Set `ORGANIZATION_TYPE` to the RDF class of the main group type:
+
+```yml
+login:
+  image: lblod/acmidm-login-service
+  environment:
+    # OpenID settings from Quick setup
+    GROUP_TYPE_LABEL: "organizations"
+    ORGANIZATION_TYPE: "http://www.w3.org/ns/org#Organization"
+```
+
+## Authentication guides
+
+### Authenticate with a client ID and secret
+
+Set `MU_APPLICATION_AUTH_CLIENT_ID` and `MU_APPLICATION_AUTH_CLIENT_SECRET` on the service. The Quick setup uses this method.
+
+```yml
+login:
+  image: lblod/acmidm-login-service
+  environment:
+    MU_APPLICATION_AUTH_CLIENT_ID: "my-client-id"
+    MU_APPLICATION_AUTH_CLIENT_SECRET: "my-client-secret"
+```
+
+Keep the secret private. Client ID and client secret often differ between deployment environments.
+
+### Authenticate with a private JWK
+
 To authenticate using JWT with a public/private key pair, you first need to generate a public and private key.
+`login`:
 
 ```bash
 mu script login generate-jwk
@@ -68,136 +107,147 @@ login:
 ```
 
 ## Reference
-### Configuration
-The following environment variables must be configured:
-* `MU_APPLICATION_AUTH_DISCOVERY_URL` [string]: OpenId discovery URL for authentication
-* `MU_APPLICATION_AUTH_CLIENT_ID` [string]: Client id of the application in ACM/IDM
-* `MU_APPLICATION_AUTH_REDIRECT_URI` [string]: Redirect URI of the application configured in ACM/IDM
 
-In case of authentication using a client id and secret, the following environment variable must be set:
-* `MU_APPLICATION_AUTH_CLIENT_SECRET` [string]: Client secret of the application in ACM/IDM
+### Environment variables
 
-Client ID and client secret typically differ per deployment environment.
+The service stops at startup when a required OpenID setting is missing. Defaults below come from the service code and Docker image.
 
-In case of authentication using a JWT token with a public/private key, the following environment variable can optionally be set:
-* `MU_APPLICATION_AUTH_JWK_PRIVATE_KEY` [string]: Path to a JSON file containing the private key to sign the JWT client assertion with. (default: `/config/jwk_private_key.json`)
+| Variable | Required | Type | Default | Description |
+|---|---|---|---|---|
+| `MU_APPLICATION_AUTH_DISCOVERY_URL` | Yes | URI | — | ACM/IDM discovery document. |
+| `MU_APPLICATION_AUTH_CLIENT_ID` | Yes | String | — | Client identifier sent to ACM/IDM. |
+| `MU_APPLICATION_AUTH_REDIRECT_URI` | Yes | URI | — | Callback URL used for the code exchange. |
+| `MU_APPLICATION_AUTH_CLIENT_SECRET` | No | String | — | Secret for client-secret basic auth. |
+| `MU_APPLICATION_AUTH_JWK_PRIVATE_KEY` | No* | File path | `/config/jwk_private_key.json` | Private JWK file for private-key JWT auth. |
+| `MU_APPLICATION_AUTH_USERID_CLAIM` | No | String | `rrn` | Claim that holds the user identifier. |
+| `MU_APPLICATION_AUTH_ACCOUNTID_CLAIM` | No | String | `vo_id` | Claim that holds the account identifier; `sub` is the fallback. |
+| `MU_APPLICATION_AUTH_GROUPID_CLAIM` | No | String | `vo_orgcode` | Claim used to match a group. |
+| `MU_APPLICATION_AUTH_ROLE_CLAIM` | No | String | `abb_loketLB_rol_3d` | Claim that holds session roles. |
+| `MU_APPLICATION_RESOURCE_BASE_URI` | No | URI | `http://data.lblod.info/` | Prefix for new user, account, and identifier URIs. |
+| `MU_APPLICATION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph searched for groups and used for new economic-actor organizations. |
+| `USER_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for users in each group; `{{groupId}}` is optional. |
+| `ACCOUNT_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for accounts in each group; `{{groupId}}` is optional. |
+| `SESSION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/sessions` | Graph for sessions. |
+| `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group. |
+| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. Allowed values are `bestuurseenheden` and `organizations`; use `organizations` for organization mode. |
+| `ENABLE_EMAIL_CLAIM` | No | Boolean | `false` | Enables storage of the `vo_email` claim only when set to `true`. |
+| `LOGS_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph for rejected-login log entries. |
+| `DEBUG_LOG_TOKENSETS` | No | String | — | Enables token-set and claim logging; any set value, including `false`, enables it. |
+| `LOG_SINK_URL` | No | URI | — | URL that receives token sets. |
+| `MU_APPLICATION_AUTH_REQUEST_TIMEOUT` | No | Integer | `5000` | OpenID HTTP request timeout in milliseconds. |
+| `MU_SPARQL_ENDPOINT` | No | URI | — | Loaded by `config.js`, but unused by this service's own code. |
 
-The following environment variables can optionally be set to configure the name of the claim from which specific information is retrieved:
-* `MU_APPLICATION_AUTH_ROLE_CLAIM` [string]: Key of the claim that contains the user's roles (default `abb_loketLB_rol_3d`)
-* `MU_APPLICATION_AUTH_USERID_CLAIM` [string]: Key of the claim that contains the user's identifier (default `rrn`)
-* `MU_APPLICATION_AUTH_ACCOUNTID_CLAIM` [string]: Key of the claim that contains the account's identifier (default `vo_id`)
-* `MU_APPLICATION_AUTH_GROUPID_CLAIM` [string]: Key of the claim that contains the identifier for the user's group (default `vo_orgcode`)
-
-The following environment variables can optionally be set to configure the graphs and base URIs for the generated data:
-* `MU_APPLICATION_RESOURCE_BASE_URI` [string]: Base URI to use for resources created by this service. The URI must end with a trailing slash! (default: `http://data.lblod.info/`)
-* `MU_APPLICATION_GRAPH` [string]: URI of the graph in which Bestuurseenheden are stored (default `http://mu.semte.ch/graphs/public`)
-* `SESSION_GRAPH` [string]: URI of the graph in which sessions are stored (default `http://mu.semte.ch/graphs/sessions`)
-* `ACCOUNT_GRAPH_TEMPLATE` [string]: URI template of the graph in which accounts are stored. You can (optionally use) `{{groupId}}` (default `http://mu.semte.ch/graphs/organizations/{{groupId}}`)
-* `USER_GRAPH_TEMPLATE` [string]: URI template of the graph in which users are stored. You can (optionally use) `{{groupId}}` (default `http://mu.semte.ch/graphs/organizations/{{groupId}}`)
-* `LOGS_GRAPH` [string]: URI of the graph in which LogEntries are stored (default `http://mu.semte.ch/graphs/public`).
-
-The following environment variables can optionally be set:
-* `ENABLE_EMAIL_CLAIM` [boolean]: When set to `true`, the service processes and stores the user's email address from the `vo_email` claim. (default `false`)
-* `DEBUG_LOG_TOKENSETS`: When set, received tokenSet information is logged to the console.
-* `LOG_SINK_URL`: When set, received tokenSet information is sent to the configured sink URL.
-* `MU_APPLICATION_AUTH_REQUEST_TIMEOUT` [int]: Timeout in ms of OpenID HTTP requests (default `5000`)
+* Authentication needs a client secret or a private JWK file. For JWK authentication, store the file at the default path or set this variable to its path. A client secret takes priority when both are available.
 
 ### Data model
+
 #### Prefixes
-| Prefix  | URI                                         |
-|---------|---------------------------------------------|
-| adms    | http://www.w3.org/ns/adms#                  |
-| foaf    | http://xmlns.com/foaf/0.1/                  |
-| skos    | http://www.w3.org/2004/02/skos/core#        |
-| dcterms | http://purl.org/dc/terms/                   |
-| besluit | http://data.vlaanderen.be/ns/besluit#       |
-| ext     | http://mu.semte.ch/vocabularies/ext/        |
-| acmidm  | http://mu.semte.ch/vocabularies/ext/acmidm/ |
+
+| Prefix | URI |
+|---|---|
+| adms | http://www.w3.org/ns/adms# |
+| foaf | http://xmlns.com/foaf/0.1/ |
+| skos | http://www.w3.org/2004/02/skos/core# |
+| dcterms | http://purl.org/dc/terms/ |
+| besluit | http://data.vlaanderen.be/ns/besluit# |
+| org | http://www.w3.org/ns/org# |
+| session | http://mu.semte.ch/vocabularies/session/ |
+| ext | http://mu.semte.ch/vocabularies/ext/ |
+| acmidm | http://mu.semte.ch/vocabularies/ext/acmidm/ |
 
 #### User
+
 ##### Class
+
 `foaf:Person`
+
 ##### Properties
-| Name       | Predicate       | Range           | Definition                    |
-|------------|-----------------|-----------------|-------------------------------|
-| identifier | adms:identifier | adms:Identifier | Unique identifier of the user |
-| firstName  | foaf:firstName  | string          | First name of the user        |
-| familyName | foaf:familyName | string          | Last name of the user         |
-| email      | foaf:email      | string          | Email address of the user     |
+
+| Name | Predicate | Range | Definition |
+|---|---|---|---|
+| identifier | adms:identifier | adms:Identifier | Unique user identifier. |
+| firstName | foaf:firstName | string | User's first name, when supplied. |
+| familyName | foaf:familyName | string | User's last name, when supplied. |
+| email | foaf:email | string | User's email, when `ENABLE_EMAIL_CLAIM` is `true` and `vo_email` is supplied. |
 
 #### Identifier
+
 ##### Class
+
 `adms:Identifier`
+
 ##### Properties
-| Name     | Predicate     | Range  | Definition                                                                               |
-|----------|---------------|--------|------------------------------------------------------------------------------------------|
-| notation | skos:notation | string | Value by which the user can be uniquely identified. Value of the `rrn` claim by default. |
+
+| Name | Predicate | Range | Definition |
+|---|---|---|---|
+| notation | skos:notation | string | User identifier from `MU_APPLICATION_AUTH_USERID_CLAIM`; `rrn` by default. |
+
 #### Account
+
 ##### Class
+
 `foaf:OnlineAccount`
+
 ##### Properties
-| Name          | Predicate            | Range  | Definition                                                                                    |
-|---------------|----------------------|--------|-----------------------------------------------------------------------------------------------|
-| identifier    | dcterms:identifier   | string | Value by which the account can be uniquely identified. Value of the `vo_id` claim by default. |
-| doelgroepcode | acmidm:doelgroepCode | string | Code of the target group as received from ACM/IDM                                                                                              |
-| doelgroepnaam | acmidm:doelgroepNaam | string | Name of the target group as received from ACM/IDM                                                                                              |
+
+| Name | Predicate | Range | Definition |
+|---|---|---|---|
+| identifier | dcterms:identifier | string | Account identifier from `MU_APPLICATION_AUTH_ACCOUNTID_CLAIM`, or `sub` when absent. |
+| doelgroepcode | acmidm:doelgroepCode | string | Target-group code from ACM/IDM, when supplied. |
+| doelgroepnaam | acmidm:doelgroepNaam | string | Target-group name from ACM/IDM, when supplied. |
+
 #### Group
+
 ##### Class
-`besluit:Bestuurseenheid`
+
+The RDF class set by `ORGANIZATION_TYPE`: `besluit:Bestuurseenheid` by default, or the main group class in organization mode.
 
 #### Session
+
 ##### Class
+
 n/a
+
 ##### Properties
-| Name    | Predicate        | Range                   | Definition                                      |
-|---------|------------------|-------------------------|-------------------------------------------------|
-| account | session:account  | foaf:OnlineAccount      | Account linked to the authenticated session.    |
-| group   | ext:sessionGroup | besluit:Bestuurseenheid | Group associated with the authenticated session. |
-| role    | ext:sessionRole  | string                  | User roles associated with the authenticated session.                                                |
+
+| Name | Predicate | Range | Definition |
+|---|---|---|---|
+| account | session:account | foaf:OnlineAccount | Account linked to the session. |
+| group | ext:sessionGroup | Configured group class | Group linked to the session. |
+| role | ext:sessionRole | string | Normalised user roles linked to the session. |
 
 ### API
 #### POST /sessions
-Log the user in by creating a new session, i.e. attaching the user's account to a session.
 
-Before creating a new session, the given authorization code gets exchanged for an access token with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned access token is decoded to retrieve information to attach to the user, account and the session. If the OpenID Provider returns a valid access token, a new user and account are created if they don't exist yet and a the account is attached to the session.
+Logs the user in and creates a session. The service exchanges the supplied authorisation code for ACM/IDM tokens, removes an old session with the same `mu-session-id`, then creates or finds the user and account.
 
-The service handles the following claims included in the access token. Only the claims configured through the environment variables are required. All other claims are optional.
-* `env.MU_APPLICATION_AUTH_USERID_CLAIM`<sup>1</sup>
-* `given_name`<sup>1</sup>
-* `family_name`<sup>1</sup>
-* `env.MU_APPLICATION_AUTH_ACCOUNTID_CLAIM`<sup>2</sup>
-* `vo_doelgroepcode`<sup>2</sup>
-* `vo_doelgroepnaam`<sup>2</sup>
-* `env.MU_APPLICATION_AUTH_GROUPID_CLAIM`<sup>3</sup>
-* `env.MU_APPLICATION_AUTH_ROLE_CLAIM`<sup>3</sup>
+The configured user-ID and group-ID claims are needed for a successful login. The configured account-ID claim is optional when ACM/IDM supplies `sub`. Given name, family name, audience fields, and roles are optional. Email is stored only when `ENABLE_EMAIL_CLAIM` is `true`. Roles are stored without the text after `:`.
 
-<sup>1</sup>Information is attached to the user object in the store
-
-<sup>2</sup> Information is attached to the account object in the store
-
-<sup>3</sup> Information is attached to the session in the store
+In organization mode, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
 
 ##### Request body
+
 ```javascript
 { authorizationCode: "secret" }
 ```
 
 ##### Response
+
 ###### 201 Created
 On successful login with the newly created session in the response body:
 
 ```javascript
 {
   "links": {
-    "self": "sessions/current"
+    "self": "/sessions/current"
   },
   "data": {
     "type": "sessions",
     "id": "b178ba66-206e-4551-b41e-4a46983912c0",
     "attributes": {
-        "roles": [
-            "LoketLB-mandaatGebruiker"
-        ]
+      "roles": [
+        "LoketLB-mandaatGebruiker"
+      ]
     }
   },
   "relationships": {
@@ -223,71 +273,48 @@ On successful login with the newly created session in the response body:
 }
 ```
 
+For organization mode, the group link and type use `organizations` instead.
+
 ###### 400 Bad Request
-- if session header is missing. The header should be automatically set by the [identifier](https://github.com/mu-semtech/mu-identifier).
-- if the authorization code is missing
 
-###### 401 Bad Request
-- on login failure. I.e. failure to exchange the authorization code for a valid access token with ACM/IDM
+- The session header is missing.
+- The authorisation code is missing.
 
-###### 403 Bad Request
-- if the session cannot be attached to an exsting group (bestuurseenheid) based on the received organization code from ACM/IDM
+###### 401 Unauthorized
+
+ACM/IDM rejects the authorisation code or the token exchange fails.
+
+###### 403 Forbidden
+
+No group matches the configured group-ID claim. The service also clears cached allowed groups.
 
 #### DELETE /sessions/current
-Log out the current user, i.e. remove the session associated with the current user's account.
+
+Logs out the current user by removing the session linked to the account.
 
 ##### Response
+
 ###### 204 No Content
-On successful logout
+
+The service removed the session and cleared cached allowed groups.
 
 ###### 400 Bad Request
-If session header is missing or invalid. The header should be automatically set by the [identifier](https://github.com/mu-semtech/mu-identifier).
+
+The session header is missing or does not point to a valid session.
 
 #### GET /sessions/current
-Get the current session
+
+Gets the current session.
 
 ##### Response
-###### 200 Created
 
-```javascript
-{
-  "links": {
-    "self": "sessions/current"
-  },
-  "data": {
-    "type": "sessions",
-    "id": "b178ba66-206e-4551-b41e-4a46983912c0",
-    "attributes": {
-        "roles": [
-            "LoketLB-mandaatGebruiker"
-        ]
-    }
-  },
-  "relationships": {
-    "account": {
-      "links": {
-        "related": "/accounts/f6419af0-c90f-465f-9333-e993c43e6cf2"
-      },
-      "data": {
-        "type": "accounts",
-        "id": "f6419af0-c90f-465f-9333-e993c43e6cf2"
-      }
-    },
-    "group": {
-      "links": {
-        "related": "/bestuurseenheden/f6419af0-c60f-465f-9333-e993c43e6ch5"
-      },
-      "data": {
-        "type": "bestuurseenheden",
-        "id": "f6419af0-c60f-465f-9333-e993c43e6ch5"
-      }
-    }
-  }
-}
-```
+###### 200 OK
+
+The response has the same shape as the `POST /sessions` response, with the current session, account, roles, and group.
 
 ###### 400 Bad Request
-If session header is missing or invalid. The header should be automatically set by the [identifier](https://github.com/mu-semtech/mu-identifier).
+
+The session header is missing or does not point to a valid session.
 
 ### ACM/IDM OpenID Connect
 More information on the OpenID Connect integration with ACM/IDM can be found on the [ACM/IDM documentation website](https://authenticatie.vlaanderen.be/docs/beveiligen-van-toepassingen/integratie-methoden/oidc/) (Dutch only).
@@ -295,4 +322,3 @@ More information on the OpenID Connect integration with ACM/IDM can be found on 
 Currently this service supports 2 of the authentication methods (see 'How-to guides')
 1. Authentication using client ID and secret via basic auth
 2. Authentication using a JWT token with an RSA256 public/private key
-
