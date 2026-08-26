@@ -1,107 +1,75 @@
 import { app } from 'mu';
-import { getSessionIdHeader, error } from './utils';
-import { saveLog } from './logs';
-import { getAccessToken } from './lib/openid';
-import { roleClaim, groupIdClaim, removeOldSessions, removeCurrentSession,
-         ensureUserAndAccount, insertNewSessionForAccount,
-         selectAccountBySession, selectCurrentSession,
-         selectGroupByNumber, 
-         createEconomischeActorByClaims} from './lib/session';
 import request from 'request';
-import { GROUP_TYPE_LABEL } from './config';
+import { httpError } from './utils';
+import { getAccessToken } from './lib/openid';
+import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
+import {
+  DEBUG_LOG_TOKENSETS,
+  GROUP_TYPE_LABEL,
+  LOG_SINK_URL,
+  REQUIRED_CONFIGURATION
+} from './config';
+import { organisationLoginStrategy } from './strategies/organisations';
+import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
 
-const logsGraph = process.env.LOGS_GRAPH || 'http://mu.semte.ch/graphs/public';
-
-/**
- * Configuration validation on startup
- */
-const requiredEnvironmentVariables = [
-  'MU_APPLICATION_AUTH_DISCOVERY_URL',
-  'MU_APPLICATION_AUTH_CLIENT_ID',
-  'MU_APPLICATION_AUTH_REDIRECT_URI'
-];
-requiredEnvironmentVariables.forEach(key => {
-  if (!process.env[key]) {
-    console.log(`Environment variable ${key} must be configured`);
+/* Exit during startup when a required OpenID setting is missing. */
+Object.entries(REQUIRED_CONFIGURATION).forEach(([environmentVariable, value]) => {
+  if (!value) {
+    console.log(`Environment variable ${environmentVariable} must be configured`);
     process.exit(1);
   }
 });
 
-/**
- * Log the user in by creating a new session, i.e. attaching the user's account to a session.
- *
- * Before creating a new session, the given authorization code gets exchanged for an access token
- * with an OpenID Provider (ACM/IDM) using the configured discovery URL. The returned JWT access token
- * is decoded to retrieve information to attach to the user, account and the session.
- * If the OpenID Provider returns a valid access token, a new user and account are created if they
- * don't exist yet and a the account is attached to the session.
+/* Exit during startup when GROUP_TYPE_LABEL is not 'bestuurseenheden' or 'organizations'. */
+if (GROUP_TYPE_LABEL !== 'bestuurseenheden' && GROUP_TYPE_LABEL !== 'organizations') {
+  console.log('Environment variable GROUP_TYPE_LABEL must be one of: bestuurseenheden, organizations');
+  process.exit(1);
+}
+
+/*
+ * Create a session:
+ * - exchange the authorization code
+ * - remove the previous session
+ * - delegate group-specific login work
  *
  * Body: { authorizationCode: "secret" }
  *
- * @return [201] On successful login containing the newly created session
- * @return [400] If the session header or authorization code is missing
- * @return [401] On login failure (unable to retrieve a valid access token)
- * @return [403] If no bestuurseenheid can be linked to the session
-*/
+ * Returns:
+ * - [201] Newly created session
+ * - [400] Missing session header or authorization code
+ * - [401] Invalid authorization code or failed token exchange
+ * - [403] No matching group
+ */
 app.post('/sessions', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
-  if (!sessionUri)
-    return error(res, 'Session header is missing');
-
-  const authorizationCode = req.body['authorizationCode'];
-  if (!authorizationCode)
-    return error(res, 'Authorization code is missing');
-
   try {
-    let tokenSet;
-    try {
-      tokenSet = await getAccessToken(authorizationCode);
-    } catch(e) {
-      console.log(`Failed to retrieve access token for authorization code: ${e.message || e}`);
-      return res.status(401).end();
-    }
+    const sessionUri = req.get('mu-session-id');
+    if (!sessionUri)
+      throw httpError(400, 'Session header is missing');
 
-    await removeOldSessions(sessionUri);
+    const authorizationCode = req.body.authorizationCode;
+    if (!authorizationCode)
+      throw httpError(400, 'Authorization code is missing');
+
+    const tokenSet = await getAccessToken(authorizationCode);
+
+    await deleteSessionById(sessionUri);
 
     const claims = tokenSet.claims();
 
-    if (process.env['DEBUG_LOG_TOKENSETS']) {
+    if (DEBUG_LOG_TOKENSETS) {
       console.log(`Received tokenSet ${JSON.stringify(tokenSet)} including claims ${JSON.stringify(claims)}`);
     }
 
-    if (process.env['LOG_SINK_URL'])
-      request.post({ url: process.env['LOG_SINK_URL'], body: tokenSet, json: true });
+    if (LOG_SINK_URL)
+      request.post({ url: LOG_SINK_URL, body: tokenSet, json: true });
 
-    let { groupUri, groupId } = await selectGroupByNumber(claims);
+    let sessionId, groupId, accountId, roles;
 
-    const isEconomischeActor = claims.vo_doelgroepcode == "EA"
-
-    if (!groupUri || !groupId) {
-      if(isEconomischeActor) {
-        await createEconomischeActorByClaims(claims);
-        ({ groupUri, groupId } = await selectGroupByNumber(claims));  
-
-
-        if (!groupUri || !groupId) {
-          console.log(`Error: GroupUri and GroupID are still empty even after creating them! Claims = ${JSON.stringify(claims)}`);
-          return res.header('mu-auth-allowed-groups', 'CLEAR').status(500).end();
-        }
-      } else {
-        console.log(`User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`);
-        saveLog(
-          logsGraph,
-          `http://data.lblod.info/class-names/no-bestuurseenheid-for-role`,
-          `User is not allowed to login. No bestuurseenheid found for roles ${JSON.stringify(claims[roleClaim])}`,
-          sessionUri,
-          claims[groupIdClaim]);
-        return res.header('mu-auth-allowed-groups', 'CLEAR').status(403).end();
-      }
+    if (GROUP_TYPE_LABEL === 'organizations') {
+      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
+    } else {
+      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
     }
-
-    const { accountUri, accountId } = await ensureUserAndAccount(claims, groupId);
-    const roles = (claims[roleClaim] || []).map(r => r.split(':')[0]);
-
-    const { sessionId } = await insertNewSessionForAccount(accountUri, sessionUri, groupUri, roles);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
@@ -125,51 +93,52 @@ app.post('/sessions', async function(req, res, next) {
         }
       }
     });
-  } catch(e) {
-    return next(new Error(e.message));
+  } catch (e) {
+    return next(e);
   }
 });
 
-
-/**
- * Log out from the current session, i.e. detaching the session from the user's account.
+/*
+ * Remove the current session after checking that it belongs to an account.
  *
- * @return [204] On successful logout
- * @return [400] If the session header is missing or invalid
-*/
+ * Returns:
+ * - [204] Session removed
+ * - [400] Missing session header or invalid session
+ */
 app.delete('/sessions/current', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
-  if (!sessionUri)
-    return error(res, 'Session header is missing');
-
   try {
+    const sessionUri = req.get('mu-session-id');
+    if (!sessionUri)
+      throw httpError(400, 'Session header is missing');
+
     const { accountUri } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return error(res, 'Invalid session');
+      throw httpError(400, 'Invalid session');
 
-    await removeCurrentSession(sessionUri);
+    await deleteSessionById(sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(204).end();
-  } catch(e) {
-    return next(new Error(e.message));
+  } catch (e) {
+    return next(e);
   }
 });
 
-/**
- * Get the current session
+/*
+ * Find the current session and return the standard session response.
  *
- * @return [200] The current session
- * @return [400] If the session header is missing or invalid
-*/
+ * Returns:
+ * - [200] Current session
+ * - [400] Missing session header or invalid session
+ */
 app.get('/sessions/current', async function(req, res, next) {
-  const sessionUri = getSessionIdHeader(req);
-  if (!sessionUri)
-    return next(new Error('Session header is missing'));
-
   try {
+    const sessionUri = req.get('mu-session-id');
+    if (!sessionUri)
+      throw httpError(400, 'Session header is missing');
+
     const { accountUri, accountId } = await selectAccountBySession(sessionUri);
     if (!accountUri)
-      return error(res, 'Invalid session');
+      throw httpError(400, 'Invalid session');
 
     const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
@@ -195,19 +164,18 @@ app.get('/sessions/current', async function(req, res, next) {
         }
       }
     });
-  } catch(e) {
-    return next(new Error(e.message));
+  } catch (e) {
+    return next(e);
   }
 });
 
-
-/**
- * Error handler translating thrown Errors to 500 HTTP responses
-*/
+/* Convert application errors to JSON:API error responses. */
 app.use(function(err, req, res, next) {
   console.log(`Error: ${err.message}`);
-  res.status(500);
+  if (err.headers)
+    res.set(err.headers);
+  res.status(err.status || 500);
   res.json({
-    errors: [ {title: err.message} ]
+    errors: [{ title: err.message }]
   });
 });
