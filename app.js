@@ -62,9 +62,11 @@ app.post('/sessions', async function(req, res, next) {
     if (LOG_SINK_URL)
       fetch(LOG_SINK_URL, {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(tokenSet)
-      }).catch(e => console.log(`Failed to send token set to log sink: ${e}`));
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(tokenSet),
+        redirect: 'manual'
+      }).then(response => response.body?.cancel())
+        .catch(e => console.log(`Failed to send token set to log sink: ${e.cause || e}`));
 
     let sessionId, groupId, accountId, roles;
 
