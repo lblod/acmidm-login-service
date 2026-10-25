@@ -1,4 +1,4 @@
-const { querySudo: query } = require('@lblod/mu-auth-sudo');
+const { querySudo: query } = require('../lib/sparql');
 const { TEST_GRAPH_ROOT } = require('./config');
 
 const PUBLIC_GRAPH = 'http://mu.semte.ch/graphs/public';

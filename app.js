@@ -1,6 +1,5 @@
 import { app } from 'mu';
-import request from 'request';
-import { httpError } from './utils';
+import { httpError, removeQueryAuthHeaders } from './utils';
 import { getAccessToken } from './lib/openid';
 import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
 import {
@@ -61,7 +60,11 @@ app.post('/sessions', async function(req, res, next) {
     }
 
     if (LOG_SINK_URL)
-      request.post({ url: LOG_SINK_URL, body: tokenSet, json: true });
+      fetch(LOG_SINK_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(tokenSet)
+      }).catch(e => console.log(`Failed to send token set to log sink: ${e}`));
 
     let sessionId, groupId, accountId, roles;
 
@@ -142,6 +145,7 @@ app.get('/sessions/current', async function(req, res, next) {
 
     const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
+    removeQueryAuthHeaders(res);
     return res.status(200).send({
       links: {
         self: '/sessions/current'
@@ -172,6 +176,7 @@ app.get('/sessions/current', async function(req, res, next) {
 /* Convert application errors to JSON:API error responses. */
 app.use(function(err, req, res, next) {
   console.log(`Error: ${err.message}`);
+  removeQueryAuthHeaders(res);
   if (err.headers)
     res.set(err.headers);
   res.status(err.status || 500);

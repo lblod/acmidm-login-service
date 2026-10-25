@@ -1,4 +1,4 @@
-import { updateSudo as update } from '@lblod/mu-auth-sudo';
+import { updateSudo as update } from './lib/sparql';
 import { sparqlEscapeString, sparqlEscapeUri, sparqlEscapeDateTime, uuid } from 'mu';
 
 /*

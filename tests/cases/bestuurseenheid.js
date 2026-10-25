@@ -9,7 +9,7 @@
  */
 
 /** Dependencies and test data. */
-const { updateSudo: update } = require('@lblod/mu-auth-sudo');
+const { updateSudo: update } = require('../../lib/sparql');
 const { TEST_GRAPH_ROOT, organisations } = require('../config');
 const {
   applyTestEnvironment,

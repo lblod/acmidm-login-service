@@ -10,7 +10,7 @@
 
 /** Dependencies and test data. */
 const http = require('node:http');
-const { querySudo: query, updateSudo: update } = require('@lblod/mu-auth-sudo');
+const { querySudo: query, updateSudo: update } = require('../../lib/sparql');
 const { TEST_GRAPH_ROOT, organisations } = require('../config');
 const { applyTestEnvironment, graphForGroup, loginAs } = require('../shared');
 
