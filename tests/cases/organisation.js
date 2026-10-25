@@ -9,19 +9,17 @@
  */
 
 /** Dependencies and test data. */
-const { querySudo: query, updateSudo: update } = require('@lblod/mu-auth-sudo');
+const { querySudo: query, updateSudo: update } = require('../../lib/sparql');
 const { TEST_GRAPH_ROOT, organisations } = require('../config');
 const {
   applyTestEnvironment,
   assertLoginRdf,
   assertRejectedLogin,
+  createEconomicActorHook,
   graphForGroup,
   loginAs,
   withoutConsoleLog
 } = require('../shared');
-
-const ORGANISATION_CLASSIFICATION =
-  'http://data.lblod.info/id/concept/c6157470-9fb3-4e8d-a9b7-8737dbfa3642';
 
 /** Test graph and login settings. */
 const graphs = {
@@ -57,7 +55,6 @@ const testConfig = {
       sessionUri: 'http://mu.semte.ch/sessions/acmidm-test-organisation-missing-non-economic-actor'
     }
   },
-  classification: ORGANISATION_CLASSIFICATION,
   environment: {
     ACCOUNT_GRAPH_TEMPLATE: graphs.resourceTemplate,
     LOGS_GRAPH: graphs.logs,
@@ -73,7 +70,10 @@ const testConfig = {
 
 applyTestEnvironment(testConfig.environment);
 
-const { organisationLoginStrategy } = require('../../strategies/organisations');
+const { loginWithStrategies } = require('../../strategies');
+const organisationLoginStrategy = (claims, sessionUri) => loginWithStrategies([
+  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations', createGroup: createEconomicActorHook(graphs.application) }
+], claims, sessionUri);
 const { cases } = testConfig;
 
 /** Tracks whether setup completed, so cleanup stays safe after a failed setup. */
@@ -109,7 +109,8 @@ describe('Organisation', () => {
         accountId: expect.any(String),
         groupId: testCase.seed.groupId,
         roles: ['SubsidiepuntGebruiker'],
-        sessionId: expect.any(String)
+        sessionId: expect.any(String),
+        groupLabel: 'organizations'
       });
 
       await assertLoginRdf({
@@ -147,7 +148,8 @@ describe('Organisation', () => {
         accountId: expect.any(String),
         groupId: testCase.seed.groupId,
         roles: ['SubsidiepuntGebruiker'],
-        sessionId: expect.any(String)
+        sessionId: expect.any(String),
+        groupLabel: 'organizations'
       });
       expect(repeatedSessionData.accountId).toBe(sessionData.accountId);
       expect(await findOrganisationsByCode(testCase.organisation.code)).toHaveLength(1);
@@ -180,10 +182,10 @@ describe('Organisation', () => {
   );
 
   /**
-   * Checks that an unknown economic actor gets an organisation, account, and session.
-   * The new organisation must have the correct name and classification.
+   * Checks that the createGroup hook can create the group of an unknown user.
+   * The created group must get the account and session.
    */
-  test('allows an unregistered economic actor to log in and creates its organisation', async () => {
+  test('allows an unregistered economic actor to log in through the createGroup hook', async () => {
     const testCase = cases.missingEconomicActor;
     expect(await findOrganisationsByCode(testCase.organisation.code)).toHaveLength(0);
 
@@ -196,26 +198,9 @@ describe('Organisation', () => {
       accountId: expect.any(String),
       groupId: createdOrganisation.groupId,
       roles: ['SubsidiepuntGebruiker'],
-      sessionId: expect.any(String)
+      sessionId: expect.any(String),
+      groupLabel: 'organizations'
     });
-
-    const metadataResult = await query(`
-      PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
-      PREFIX org: <http://www.w3.org/ns/org#>
-
-      SELECT ?label ?classification
-      FROM <${graphs.application}>
-      WHERE {
-        <${createdOrganisation.groupUri}> a org:Organization ;
-          skos:prefLabel ?label ;
-          org:classification ?classification .
-      }
-    `);
-    expect(metadataResult.results.bindings).toHaveLength(1);
-    expect(metadataResult.results.bindings[0].label.value).toBe(testCase.organisation.name);
-    expect(metadataResult.results.bindings[0].classification.value).toBe(
-      testConfig.classification
-    );
 
     await assertLoginRdf({
       accountDoelgroepCode: testCase.organisation.claims.vo_doelgroepcode,
@@ -258,7 +243,7 @@ describe('Organisation', () => {
   });
 
   /**
-   * Checks that an unknown non-economic actor cannot log in.
+   * Checks that a user is refused when the createGroup hook creates nothing.
    * No organisation, account, or session may be created.
    */
   test('disallows an unregistered non-economic actor from logging in', async () => {

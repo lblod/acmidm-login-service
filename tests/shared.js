@@ -1,4 +1,5 @@
-const { querySudo: query } = require('@lblod/mu-auth-sudo');
+const { randomUUID } = require('node:crypto');
+const { querySudo: query, updateSudo: update } = require('../lib/sparql');
 const { TEST_GRAPH_ROOT } = require('./config');
 
 const PUBLIC_GRAPH = 'http://mu.semte.ch/graphs/public';
@@ -37,6 +38,38 @@ function assertTestGraph(name, graph) {
 
 function graphForGroup(template, groupId) {
   return template.replace('{{groupId}}', groupId);
+}
+
+/*
+ * A createGroup hook like one a stack would mount: creates an organisation
+ * for an unknown economic actor (vo_doelgroepcode EA) and nothing otherwise.
+ */
+function createEconomicActorHook(applicationGraph) {
+  return async function(claims) {
+    if (claims.vo_doelgroepcode !== 'EA')
+      return;
+
+    const groupId = randomUUID();
+    const identifierId = randomUUID();
+    await update(`
+      PREFIX mu: <http://mu.semte.ch/vocabularies/core/>
+      PREFIX adms: <http://www.w3.org/ns/adms#>
+      PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+      PREFIX org: <http://www.w3.org/ns/org#>
+
+      INSERT DATA {
+        GRAPH <${applicationGraph}> {
+          <http://data.lblod.info/id/organisaties/${groupId}> a org:Organization ;
+            mu:uuid "${groupId}" ;
+            adms:identifier <http://data.lblod.info/id/identificatoren/${identifierId}> .
+
+          <http://data.lblod.info/id/identificatoren/${identifierId}> a adms:Identifier ;
+            mu:uuid "${identifierId}" ;
+            skos:notation "${claims.vo_orgcode}" .
+        }
+      }
+    `);
+  };
 }
 
 function loginAs(loginStrategy, testCase) {
@@ -186,6 +219,7 @@ async function waitForQuery(sparql, timeout = 2000) {
 
 module.exports = {
   applyTestEnvironment,
+  createEconomicActorHook,
   assertLoginRdf,
   assertRejectedLogin,
   graphForGroup,

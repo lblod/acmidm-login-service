@@ -9,7 +9,7 @@
  */
 
 /** Dependencies and test data. */
-const { updateSudo: update } = require('@lblod/mu-auth-sudo');
+const { updateSudo: update } = require('../../lib/sparql');
 const { TEST_GRAPH_ROOT, organisations } = require('../config');
 const {
   applyTestEnvironment,
@@ -64,7 +64,10 @@ const testConfig = {
 
 applyTestEnvironment(testConfig.environment);
 
-const { bestuurseenheidLoginStrategy } = require('../../strategies/bestuurseenheden');
+const { loginWithStrategies } = require('../../strategies');
+const bestuurseenheidLoginStrategy = (claims, sessionUri) => loginWithStrategies([
+  { type: 'http://data.vlaanderen.be/ns/besluit#Bestuurseenheid', label: 'bestuurseenheden' }
+], claims, sessionUri);
 const { cases } = testConfig;
 
 /** Tracks whether setup completed, so cleanup stays safe after a failed setup. */
@@ -100,7 +103,8 @@ describe('Bestuurseenheid', () => {
         accountId: expect.any(String),
         groupId: testCase.seed.groupId,
         roles: ['SubsidiepuntGebruiker'],
-        sessionId: expect.any(String)
+        sessionId: expect.any(String),
+        groupLabel: 'bestuurseenheden'
       });
 
       await assertLoginRdf({

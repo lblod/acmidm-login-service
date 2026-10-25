@@ -6,6 +6,17 @@ const httpError = function(statusCode, message = '', headers = {}) {
   return error;
 };
 
+/*
+ * Drop the mu-auth group headers the template copies from SPARQL responses.
+ * Sudo queries don't compute the session's groups (sparql-parser returns an
+ * empty list), so forwarding them would make the identifier cache no groups.
+ */
+const removeQueryAuthHeaders = function(res) {
+  res.removeHeader('mu-auth-allowed-groups');
+  res.removeHeader('mu-auth-used-groups');
+};
+
 export {
-  httpError
+  httpError,
+  removeQueryAuthHeaders
 };

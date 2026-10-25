@@ -10,7 +10,7 @@
 
 /** Dependencies and test data. */
 const http = require('node:http');
-const { querySudo: query, updateSudo: update } = require('@lblod/mu-auth-sudo');
+const { querySudo: query, updateSudo: update } = require('../../lib/sparql');
 const { TEST_GRAPH_ROOT, organisations } = require('../config');
 const { applyTestEnvironment, graphForGroup, loginAs } = require('../shared');
 
@@ -45,7 +45,10 @@ applyTestEnvironment({
 
 require('../../app');
 const { app } = require('mu');
-const { organisationLoginStrategy } = require('../../strategies/organisations');
+const { loginWithStrategies } = require('../../strategies');
+const organisationLoginStrategy = (claims, sessionUri) => loginWithStrategies([
+  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations' }
+], claims, sessionUri);
 
 /** HTTP route tests. */
 describe('Current session', () => {

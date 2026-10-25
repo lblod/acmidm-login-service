@@ -1,6 +1,5 @@
 import { app } from 'mu';
-import request from 'request';
-import { httpError } from './utils';
+import { httpError, removeQueryAuthHeaders } from './utils';
 import { getAccessToken } from './lib/openid';
 import { deleteSessionById, selectAccountBySession, selectCurrentSession } from './lib/session';
 import {
@@ -9,8 +8,8 @@ import {
   LOG_SINK_URL,
   REQUIRED_CONFIGURATION
 } from './config';
-import { organisationLoginStrategy } from './strategies/organisations';
-import { bestuurseenheidLoginStrategy } from './strategies/bestuurseenheden';
+import strategies from './config/strategies';
+import { loginWithStrategies } from './strategies';
 
 /* Exit during startup when a required OpenID setting is missing. */
 Object.entries(REQUIRED_CONFIGURATION).forEach(([environmentVariable, value]) => {
@@ -23,6 +22,12 @@ Object.entries(REQUIRED_CONFIGURATION).forEach(([environmentVariable, value]) =>
 /* Exit during startup when GROUP_TYPE_LABEL is not 'bestuurseenheden' or 'organizations'. */
 if (GROUP_TYPE_LABEL !== 'bestuurseenheden' && GROUP_TYPE_LABEL !== 'organizations') {
   console.log('Environment variable GROUP_TYPE_LABEL must be one of: bestuurseenheden, organizations');
+  process.exit(1);
+}
+
+/* Exit during startup when the login strategies are missing a type or label. */
+if (!strategies.length || strategies.some(strategy => !strategy.type || !strategy.label)) {
+  console.log('Every login strategy in config/strategies.js needs a type and a label');
   process.exit(1);
 }
 
@@ -61,15 +66,15 @@ app.post('/sessions', async function(req, res, next) {
     }
 
     if (LOG_SINK_URL)
-      request.post({ url: LOG_SINK_URL, body: tokenSet, json: true });
+      fetch(LOG_SINK_URL, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'accept': 'application/json' },
+        body: JSON.stringify(tokenSet),
+        redirect: 'manual'
+      }).then(response => response.body?.cancel())
+        .catch(e => console.log(`Failed to send token set to log sink: ${e.cause || e}`));
 
-    let sessionId, groupId, accountId, roles;
-
-    if (GROUP_TYPE_LABEL === 'organizations') {
-      ({ sessionId, groupId, accountId, roles } = await organisationLoginStrategy(claims, sessionUri));
-    } else {
-      ({ sessionId, groupId, accountId, roles } = await bestuurseenheidLoginStrategy(claims, sessionUri));
-    }
+    const { sessionId, groupId, accountId, roles, groupLabel } = await loginWithStrategies(strategies, claims, sessionUri);
 
     return res.header('mu-auth-allowed-groups', 'CLEAR').status(201).send({
       links: {
@@ -88,8 +93,8 @@ app.post('/sessions', async function(req, res, next) {
           data: { type: 'accounts', id: accountId }
         },
         group: {
-          links: { related: `/${GROUP_TYPE_LABEL}/${groupId}` },
-          data: { type: GROUP_TYPE_LABEL, id: groupId }
+          links: { related: `/${groupLabel}/${groupId}` },
+          data: { type: groupLabel, id: groupId }
         }
       }
     });
@@ -136,12 +141,13 @@ app.get('/sessions/current', async function(req, res, next) {
     if (!sessionUri)
       throw httpError(400, 'Session header is missing');
 
-    const { accountUri, accountId } = await selectAccountBySession(sessionUri);
+    const { accountUri, accountId, groupLabel } = await selectAccountBySession(sessionUri);
     if (!accountUri)
       throw httpError(400, 'Invalid session');
 
     const { sessionId, groupId, roles } = await selectCurrentSession(sessionUri, accountUri);
 
+    removeQueryAuthHeaders(res);
     return res.status(200).send({
       links: {
         self: '/sessions/current'
@@ -159,8 +165,8 @@ app.get('/sessions/current', async function(req, res, next) {
           data: { type: 'accounts', id: accountId }
         },
         group: {
-          links: { related: `/${GROUP_TYPE_LABEL}/${groupId}` },
-          data: { type: GROUP_TYPE_LABEL, id: groupId }
+          links: { related: `/${groupLabel}/${groupId}` },
+          data: { type: groupLabel, id: groupId }
         }
       }
     });
@@ -172,6 +178,7 @@ app.get('/sessions/current', async function(req, res, next) {
 /* Convert application errors to JSON:API error responses. */
 app.use(function(err, req, res, next) {
   console.log(`Error: ${err.message}`);
+  removeQueryAuthHeaders(res);
   if (err.headers)
     res.set(err.headers);
   res.status(err.status || 500);
