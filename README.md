@@ -66,6 +66,44 @@ login:
     ORGANIZATION_TYPE: "http://www.w3.org/ns/org#Organization"
 ```
 
+When no group matches and the user is an economic actor (`vo_doelgroepcode` is `EA`), the service creates its organization from the claims.
+
+### Several group types (some users log in to a bestuurseenheid, others to another organization)
+
+Mount a `strategies.js` file at `/config/strategies.js`. It lists login strategies in order. The first strategy that finds a group for the user creates the session, and session responses use that strategy's label as the group type:
+
+```javascript
+// ./config/login/strategies.js
+export default [
+  {
+    type: 'http://data.vlaanderen.be/ns/besluit#Bestuurseenheid',
+    label: 'bestuurseenheden'
+  },
+  {
+    type: 'http://www.w3.org/ns/org#Organization',
+    label: 'organizations',
+    createEconomicActors: true
+  }
+];
+```
+
+```yml
+login:
+  image: lblod/acmidm-login-service
+  volumes:
+    - ./config/login:/config
+```
+
+Each strategy has:
+
+- `type`: RDF class of the group.
+- `label`: group type in API responses.
+- `createEconomicActors` (optional): create the organization of an unknown economic actor instead of refusing the login.
+
+Order matters when a group has the types of several strategies: put the most specific type first. `GROUP_TYPE_LABEL` and `ORGANIZATION_TYPE` only configure the default strategy, so a mounted `strategies.js` replaces them.
+
+If you authenticate with a private JWK, put `strategies.js` in the same folder as `jwk_private_key.json`; both are read from `/config`.
+
 ## Authentication guides
 
 ### Authenticate with a client ID and secret
@@ -116,6 +154,8 @@ mu script <service-name> test
 
 Replace `<service-name>` with the service name from your stack's `docker-compose.yml`. The command finds the running container with this service mounted at `/app`, runs all Jest suites there, and prints a console coverage report.
 
+The tests run sudo queries. If your development setup runs the service on the plain `semtech/mu-javascript-template` image, set `ALLOW_MU_AUTH_SUDO: "true"` on it; the service image sets it already.
+
 This requires a `mu-cli` version that supports script config version `0.3`, `mounts.host`, and host permissions.
 
 ## Reference
@@ -140,14 +180,15 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 | `USER_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for users in each group; `{{groupId}}` is optional. |
 | `ACCOUNT_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for accounts in each group; `{{groupId}}` is optional. |
 | `SESSION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/sessions` | Graph for sessions. |
-| `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group. |
-| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Strategy selector and group type in API responses. Leave empty to use the default; otherwise allowed values are `bestuurseenheden` and `organizations`. Use `organizations` for organization mode. |
+| `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group in the default strategy. Ignored when you mount `/config/strategies.js`. |
+| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Group type in API responses for the default strategy; `organizations` also creates unknown economic actors. Leave empty to use the default; otherwise allowed values are `bestuurseenheden` and `organizations`. Ignored when you mount `/config/strategies.js`. |
 | `ENABLE_EMAIL_CLAIM` | No | Boolean | `false` | Enables storage of the `vo_email` claim only when set to `true`. |
 | `LOGS_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph for rejected-login log entries. |
 | `DEBUG_LOG_TOKENSETS` | No | String | — | Enables token-set and claim logging; any set value, including `false`, enables it. |
 | `LOG_SINK_URL` | No | URI | — | URL that receives token sets. |
 | `MU_APPLICATION_AUTH_REQUEST_TIMEOUT` | No | Integer | `5000` | OpenID HTTP request timeout in milliseconds. |
-| `MU_SPARQL_ENDPOINT` | No | URI | — | Loaded by `config.js`, but unused by this service's own code. |
+| `MU_SPARQL_ENDPOINT` | No | URI | `http://database:8890/sparql` | SPARQL endpoint for all queries. |
+| `ALLOW_MU_AUTH_SUDO` | No | Boolean | `true` | Set by the image. The service runs its queries as sudo and fails without it. |
 
 * Authentication needs a client secret or a private JWK file. For JWK authentication, store the file at the default path or set this variable to its path. A client secret takes priority when both are available.
 
@@ -212,7 +253,7 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 
 ##### Class
 
-The RDF class set by `ORGANIZATION_TYPE`: `besluit:Bestuurseenheid` by default, or the main group class in organization mode.
+The RDF class of the strategy that matched the user: `ORGANIZATION_TYPE` (`besluit:Bestuurseenheid` by default) unless you mount your own strategies.
 
 #### Session
 
@@ -235,7 +276,7 @@ Logs the user in and creates a session. The service exchanges the supplied autho
 
 The configured user-ID and group-ID claims are needed for a successful login. The configured account-ID claim is optional when ACM/IDM supplies `sub`. Given name, family name, audience fields, and roles are optional. Email is stored only when `ENABLE_EMAIL_CLAIM` is `true`. Roles are stored without the text after `:`.
 
-In organization mode, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
+When a strategy creates economic actors, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
 
 ##### Request body
 
@@ -285,7 +326,7 @@ On successful login with the newly created session in the response body:
 }
 ```
 
-For organization mode, the group link and type use `organizations` instead.
+The group link and type use the label of the strategy that matched the user, e.g. `organizations` in organization mode.
 
 ###### 400 Bad Request
 

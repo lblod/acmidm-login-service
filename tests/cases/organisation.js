@@ -73,7 +73,10 @@ const testConfig = {
 
 applyTestEnvironment(testConfig.environment);
 
-const { organisationLoginStrategy } = require('../../strategies/organisations');
+const { loginWithStrategies } = require('../../strategies');
+const organisationLoginStrategy = (claims, sessionUri) => loginWithStrategies([
+  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations', createEconomicActors: true }
+], claims, sessionUri);
 const { cases } = testConfig;
 
 /** Tracks whether setup completed, so cleanup stays safe after a failed setup. */
@@ -109,7 +112,8 @@ describe('Organisation', () => {
         accountId: expect.any(String),
         groupId: testCase.seed.groupId,
         roles: ['SubsidiepuntGebruiker'],
-        sessionId: expect.any(String)
+        sessionId: expect.any(String),
+        groupLabel: 'organizations'
       });
 
       await assertLoginRdf({
@@ -147,7 +151,8 @@ describe('Organisation', () => {
         accountId: expect.any(String),
         groupId: testCase.seed.groupId,
         roles: ['SubsidiepuntGebruiker'],
-        sessionId: expect.any(String)
+        sessionId: expect.any(String),
+        groupLabel: 'organizations'
       });
       expect(repeatedSessionData.accountId).toBe(sessionData.accountId);
       expect(await findOrganisationsByCode(testCase.organisation.code)).toHaveLength(1);
@@ -196,7 +201,8 @@ describe('Organisation', () => {
       accountId: expect.any(String),
       groupId: createdOrganisation.groupId,
       roles: ['SubsidiepuntGebruiker'],
-      sessionId: expect.any(String)
+      sessionId: expect.any(String),
+      groupLabel: 'organizations'
     });
 
     const metadataResult = await query(`

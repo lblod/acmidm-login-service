@@ -45,7 +45,10 @@ applyTestEnvironment({
 
 require('../../app');
 const { app } = require('mu');
-const { organisationLoginStrategy } = require('../../strategies/organisations');
+const { loginWithStrategies } = require('../../strategies');
+const organisationLoginStrategy = (claims, sessionUri) => loginWithStrategies([
+  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations', createEconomicActors: true }
+], claims, sessionUri);
 
 /** HTTP route tests. */
 describe('Current session', () => {
