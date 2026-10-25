@@ -2,11 +2,10 @@ import { ensureUserAndAccount, insertNewSessionForAccount, selectGroupByNumber }
 import { saveLog } from '../logs';
 import { GROUP_ID_CLAIM, LOGS_GRAPH, ROLE_CLAIM } from '../config';
 import { httpError } from '../utils';
-import { createEconomicActorFromClaims, isEconomicActor } from './economic-actors';
 
 /*
  * Create a session with the first strategy that finds a group:
- * - find the group, or create it for an economic actor when the strategy allows it
+ * - find the group, or let the strategy's createGroup hook create it
  * - ensure the user and account
  * - store the session
  */
@@ -15,8 +14,8 @@ export async function loginWithStrategies(strategies, claims, sessionUri) {
     let { groupUri, groupId } = await selectGroupByNumber(claims, strategy.type);
     const hasNoMatchingGroup = !groupUri || !groupId;
 
-    if (hasNoMatchingGroup && strategy.createEconomicActors && isEconomicActor(claims)) {
-      await createEconomicActorFromClaims(claims);
+    if (hasNoMatchingGroup && strategy.createGroup) {
+      await strategy.createGroup(claims);
       ({ groupUri, groupId } = await selectGroupByNumber(claims, strategy.type));
     }
 

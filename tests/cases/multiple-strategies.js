@@ -2,7 +2,7 @@
  * Overview
  *
  * Tests a stack configured with two login strategies: bestuurseenheden first,
- * then organisations that may create economic actors. The first strategy that
+ * then organisations with a createGroup hook for economic actors. The first strategy that
  * finds a group creates the session, and the current-session route reports the
  * group type of that strategy.
  *
@@ -20,13 +20,20 @@ const { applyTestEnvironment, graphForGroup, withoutConsoleLog } = require('../s
 const BESTUURSEENHEID = 'http://data.vlaanderen.be/ns/besluit#Bestuurseenheid';
 const ORGANIZATION = 'http://www.w3.org/ns/org#Organization';
 
-jest.mock('../../config/strategies', () => ({
-  __esModule: true,
-  default: [
-    { type: 'http://data.vlaanderen.be/ns/besluit#Bestuurseenheid', label: 'bestuurseenheden' },
-    { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations', createEconomicActors: true }
-  ]
-}));
+jest.mock('../../config/strategies', () => {
+  const { createEconomicActorHook } = jest.requireActual('../shared');
+  return {
+    __esModule: true,
+    default: [
+      { type: 'http://data.vlaanderen.be/ns/besluit#Bestuurseenheid', label: 'bestuurseenheden' },
+      {
+        type: 'http://www.w3.org/ns/org#Organization',
+        label: 'organizations',
+        createGroup: createEconomicActorHook(`${jest.requireActual('../config').TEST_GRAPH_ROOT}multiple-strategies/application`)
+      }
+    ]
+  };
+});
 
 /** Test graph and login settings. */
 const graphs = {
@@ -124,8 +131,8 @@ describe('Multiple strategies', () => {
   });
 
   /**
-   * Checks that a strategy that creates economic actors still does so when an
-   * earlier strategy found no group.
+   * Checks that a later strategy's createGroup hook still runs when an earlier
+   * strategy found no group.
    */
   test('creates an unregistered economic actor with the organisation strategy', async () => {
     const sessionData = await login(cases.missingEconomicActor);

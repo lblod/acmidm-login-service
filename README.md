@@ -66,8 +66,6 @@ login:
     ORGANIZATION_TYPE: "http://www.w3.org/ns/org#Organization"
 ```
 
-When no group matches and the user is an economic actor (`vo_doelgroepcode` is `EA`), the service creates its organization from the claims.
-
 ### Several group types (some users log in to a bestuurseenheid, others to another organization)
 
 Mount a `strategies.js` file at `/config/strategies.js`. It lists login strategies in order. The first strategy that finds a group for the user creates the session, and session responses use that strategy's label as the group type:
@@ -81,8 +79,7 @@ export default [
   },
   {
     type: 'http://www.w3.org/ns/org#Organization',
-    label: 'organizations',
-    createEconomicActors: true
+    label: 'organizations'
   }
 ];
 ```
@@ -98,11 +95,64 @@ Each strategy has:
 
 - `type`: RDF class of the group.
 - `label`: group type in API responses.
-- `createEconomicActors` (optional): create the organization of an unknown economic actor instead of refusing the login.
+- `createGroup` (optional): `async (claims) => {}`, called when no group of this strategy matches. It may create the group; the service then looks the group up again by `type` and the group-ID claim, and refuses the login if there is still none.
 
 Order matters when a group has the types of several strategies: put the most specific type first. `GROUP_TYPE_LABEL` and `ORGANIZATION_TYPE` only configure the default strategy, so a mounted `strategies.js` replaces them.
 
 If you authenticate with a private JWK, put `strategies.js` in the same folder as `jwk_private_key.json`; both are read from `/config`.
+
+#### Create groups on first login
+
+A `createGroup` hook runs inside the service, so it can use the template's SPARQL helpers. Use `{ sudo: true }`: the user isn't logged in yet. This example creates the organization of an unknown economic actor, as the `verenigingen` images (`0.12.0-verenigingen-rc.*`, `0.1.0-verenigingen`) did for `GROUP_TYPE_LABEL: "organizations"`:
+
+```javascript
+// ./config/login/strategies.js
+import { update, uuid, sparqlEscapeString, sparqlEscapeUri, sparqlEscapeDateTime } from 'mu';
+
+async function createEconomicActor(claims) {
+  if (claims.vo_doelgroepcode !== 'EA' || !claims.vo_orgcode || !claims.vo_orgnaam)
+    return;
+
+  const organisationId = uuid();
+  const identifierId = uuid();
+  const organisation = `http://data.lblod.info/id/organisaties/${organisationId}`;
+  const identifier = `http://data.lblod.info/id/identificatoren/${identifierId}`;
+  const now = new Date();
+
+  await update(`
+    PREFIX mu: <http://mu.semte.ch/vocabularies/core/>
+    PREFIX skos: <http://www.w3.org/2004/02/skos/core#>
+    PREFIX dcterms: <http://purl.org/dc/terms/>
+    PREFIX adms: <http://www.w3.org/ns/adms#>
+    PREFIX org: <http://www.w3.org/ns/org#>
+
+    INSERT DATA {
+      GRAPH <http://mu.semte.ch/graphs/public> {
+        ${sparqlEscapeUri(organisation)} a org:Organization ;
+          mu:uuid ${sparqlEscapeString(organisationId)} ;
+          skos:prefLabel ${sparqlEscapeString(claims.vo_orgnaam)} ;
+          org:classification <http://data.lblod.info/id/concept/c6157470-9fb3-4e8d-a9b7-8737dbfa3642> ;
+          adms:identifier ${sparqlEscapeUri(identifier)} ;
+          dcterms:created ${sparqlEscapeDateTime(now)} ;
+          dcterms:modified ${sparqlEscapeDateTime(now)} .
+
+        ${sparqlEscapeUri(identifier)} a adms:Identifier ;
+          mu:uuid ${sparqlEscapeString(identifierId)} ;
+          skos:notation ${sparqlEscapeString(claims.vo_orgcode)} .
+      }
+    }`, { sudo: true });
+}
+
+export default [
+  {
+    type: 'http://www.w3.org/ns/org#Organization',
+    label: 'organizations',
+    createGroup: createEconomicActor
+  }
+];
+```
+
+The group must be created in `MU_APPLICATION_GRAPH` with the strategy's `type`, a `mu:uuid`, and the group-ID claim as `dcterms:identifier` or `adms:identifier/skos:notation`.
 
 ## Authentication guides
 
@@ -176,12 +226,12 @@ The service stops at startup when a required OpenID setting is missing. Defaults
 | `MU_APPLICATION_AUTH_GROUPID_CLAIM` | No | String | `vo_orgcode` | Claim used to match a group. |
 | `MU_APPLICATION_AUTH_ROLE_CLAIM` | No | String | `abb_loketLB_rol_3d` | Claim that holds session roles. |
 | `MU_APPLICATION_RESOURCE_BASE_URI` | No | URI | `http://data.lblod.info/` | Prefix for new user, account, and identifier URIs. |
-| `MU_APPLICATION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph searched for groups and used for new economic-actor organizations. |
+| `MU_APPLICATION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph searched for groups. |
 | `USER_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for users in each group; `{{groupId}}` is optional. |
 | `ACCOUNT_GRAPH_TEMPLATE` | No | URI template | `http://mu.semte.ch/graphs/organizations/{{groupId}}` | Graph for accounts in each group; `{{groupId}}` is optional. |
 | `SESSION_GRAPH` | No | URI | `http://mu.semte.ch/graphs/sessions` | Graph for sessions. |
 | `ORGANIZATION_TYPE` | No | URI | `http://data.vlaanderen.be/ns/besluit#Bestuurseenheid` | RDF class used to match a group in the default strategy. Ignored when you mount `/config/strategies.js`. |
-| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Group type in API responses for the default strategy; `organizations` also creates unknown economic actors. Leave empty to use the default; otherwise allowed values are `bestuurseenheden` and `organizations`. Ignored when you mount `/config/strategies.js`. |
+| `GROUP_TYPE_LABEL` | No | String | `bestuurseenheden` | Group type in API responses for the default strategy. Leave empty to use the default; otherwise allowed values are `bestuurseenheden` and `organizations`. Ignored when you mount `/config/strategies.js`. |
 | `ENABLE_EMAIL_CLAIM` | No | Boolean | `false` | Enables storage of the `vo_email` claim only when set to `true`. |
 | `LOGS_GRAPH` | No | URI | `http://mu.semte.ch/graphs/public` | Graph for rejected-login log entries. |
 | `DEBUG_LOG_TOKENSETS` | No | String | — | Enables token-set and claim logging; any set value, including `false`, enables it. |
@@ -275,8 +325,6 @@ n/a
 Logs the user in and creates a session. The service exchanges the supplied authorisation code for ACM/IDM tokens, removes an old session with the same `mu-session-id`, then creates or finds the user and account.
 
 The configured user-ID and group-ID claims are needed for a successful login. The configured account-ID claim is optional when ACM/IDM supplies `sub`. Given name, family name, audience fields, and roles are optional. Email is stored only when `ENABLE_EMAIL_CLAIM` is `true`. Roles are stored without the text after `:`.
-
-When a strategy creates economic actors, an economic actor also needs `vo_orgcode` and `vo_orgnaam` when the service must create its group.
 
 ##### Request body
 

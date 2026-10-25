@@ -47,7 +47,7 @@ require('../../app');
 const { app } = require('mu');
 const { loginWithStrategies } = require('../../strategies');
 const organisationLoginStrategy = (claims, sessionUri) => loginWithStrategies([
-  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations', createEconomicActors: true }
+  { type: 'http://www.w3.org/ns/org#Organization', label: 'organizations' }
 ], claims, sessionUri);
 
 /** HTTP route tests. */

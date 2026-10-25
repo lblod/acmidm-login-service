@@ -8,8 +8,9 @@ import { GROUP_TYPE_LABEL, ORGANIZATION_TYPE } from './index';
  * Each strategy has:
  * - type: RDF class of the group
  * - label: JSON:API type of the group in session responses
- * - createEconomicActors: create the organisation of an unknown economic actor
- *   (vo_doelgroepcode EA) instead of refusing the login
+ * - createGroup (optional): async function (claims) called when no group
+ *   matches. It may create the group; the service then looks the group up
+ *   again with the strategy's type and the group-ID claim.
  *
  * The default is the single strategy configured through ORGANIZATION_TYPE and
  * GROUP_TYPE_LABEL.
@@ -17,7 +18,6 @@ import { GROUP_TYPE_LABEL, ORGANIZATION_TYPE } from './index';
 export default [
   {
     type: ORGANIZATION_TYPE,
-    label: GROUP_TYPE_LABEL,
-    createEconomicActors: GROUP_TYPE_LABEL === 'organizations'
+    label: GROUP_TYPE_LABEL
   }
 ];
